@@ -114,6 +114,7 @@ def main():
     x_train, y_train, x_val, y_val = train_test_split(x, y, 3000, random_state=seed)
 
     # train with xgboost
+    best_model, best_f1_score = None, 0
     for n_estimators in [10, 20, 50, 100]:
         print(f'n_estimators: {n_estimators}')
         model = XGBClassifier(n_estimators=n_estimators, learning_rate=0.3, verbosity=0, random_state=seed)
@@ -124,16 +125,22 @@ def main():
         plt.savefig(os.path.join(OUT_DIR, f'{n_estimators}.png'))
 
         y_pred = model.predict(x_train)
-        print('train f1 score:\t{:.4f}'.format(f1_score(y_train, y_pred, average='macro')))
+        train_f1_score = f1_score(y_train, y_pred, average='macro')
+        print('train f1 score:\t{:.4f}'.format(train_f1_score))
 
         y_pred = model.predict(x_val)
-        print('val f1 score:\t{:.4f}\n'.format(f1_score(y_val, y_pred, average='macro')))
+        val_f1_score = f1_score(y_val, y_pred, average='macro')
+        print('val f1 score:\t{:.4f}\n'.format(val_f1_score))
+
+        if val_f1_score > best_f1_score:
+            best_model = model
+            best_f1_score = val_f1_score
 
     # testing phase
     customers = load_data(DATA_DIR, mode='Test')
     _, _, x_test = preprocess_data(customers, mapper)
     print(f'test data shape: {x_test.shape}')
-    y_pred = model.predict(x_test)
+    y_pred = best_model.predict(x_test)
     print(y_pred)
     out = pd.DataFrame({
         'Customer ID': customers['Customer ID'],

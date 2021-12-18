@@ -6,7 +6,7 @@ Customer ID,Churn Category
 0701-TJSEF,Competitor
 1226-UDFZR,No Churn
 9225-BZLNZ,No Churn
-2754-SDJRD,Price
+2754-SDJRD,Competitor
 2254-DLXRI,No Churn
 3629-ZNKXA,Competitor
 2636-SJDOU,No Churn
@@ -39,7 +39,7 @@ Customer ID,Churn Category
 2592-YKDIF,No Churn
 0980-FEXWF,No Churn
 8670-MEFCP,No Churn
-4664-NJCMS,Dissatisfaction
+4664-NJCMS,Competitor
 7319-ZNRTR,No Churn
 3877-JRJIP,No Churn
 1552-TKMXS,No Churn
@@ -48,7 +48,7 @@ Customer ID,Churn Category
 1088-CNNKB,Competitor
 2187-PKZAY,No Churn
 2466-NEJOJ,No Churn
-2969-VAPYH,Competitor
+2969-VAPYH,No Churn
 4971-PUYQO,Competitor
 9638-JIQYA,No Churn
 3251-YMVWZ,No Churn
@@ -73,7 +73,7 @@ Customer ID,Churn Category
 2812-SFXMJ,No Churn
 3156-QLHBO,No Churn
 4445-KWOKW,Competitor
-4250-ZBWLV,Attitude
+4250-ZBWLV,No Churn
 9847-HNVGP,No Churn
 0022-TCJCI,No Churn
 6180-YBIQI,No Churn
@@ -147,7 +147,7 @@ Customer ID,Churn Category
 7134-HBPBS,No Churn
 0734-OXWBT,No Churn
 4815-GBTCD,No Churn
-7020-OZKXZ,Dissatisfaction
+7020-OZKXZ,Competitor
 3133-PZNSR,No Churn
 9385-EHGDO,No Churn
 8644-XYTSV,No Churn
@@ -162,7 +162,7 @@ Customer ID,Churn Category
 3387-PLKUI,Competitor
 9894-EZEWG,No Churn
 3061-BCKYI,Competitor
-4323-ELYYB,No Churn
+4323-ELYYB,Competitor
 1333-PBMXB,Competitor
 4945-RVMTE,No Churn
 9508-ILZDG,No Churn
@@ -196,7 +196,7 @@ Customer ID,Churn Category
 9552-TGUZV,No Churn
 6072-NUQCB,No Churn
 2219-MVUSO,No Churn
-8067-NIOYM,Competitor
+8067-NIOYM,No Churn
 8155-IBNHG,No Churn
 4833-QTJNO,No Churn
 3627-FCRDW,No Churn
@@ -311,7 +311,7 @@ Customer ID,Churn Category
 4884-TVUQF,Dissatisfaction
 5995-OIGLP,Competitor
 0585-EGDDA,No Churn
-9541-PWTWO,Competitor
+9541-PWTWO,Other
 0716-BQNDX,No Churn
 6319-QSUSR,No Churn
 2018-PZKMU,No Churn
@@ -321,7 +321,7 @@ Customer ID,Churn Category
 6762-QVYJO,No Churn
 0027-KWYKW,Attitude
 2832-KJCRD,No Churn
-1106-HRLKZ,Attitude
+1106-HRLKZ,No Churn
 2951-QOQTK,Price
 3966-HRMZA,Competitor
 0297-RBCSG,No Churn
@@ -352,7 +352,7 @@ Customer ID,Churn Category
 8292-TYSPY,No Churn
 2988-PLAHS,No Churn
 4439-JMPMT,No Churn
-2017-CCBLH,Attitude
+2017-CCBLH,Competitor
 4989-LIXVT,No Churn
 4079-ULGFR,No Churn
 2379-GYFLQ,No Churn
@@ -362,10 +362,10 @@ Customer ID,Churn Category
 9931-DCEZH,No Churn
 4544-RXFMG,No Churn
 2144-ESWKO,No Churn
-7898-PDWQE,Dissatisfaction
+7898-PDWQE,Competitor
 3255-GRXMG,No Churn
 3413-BMNZE,Competitor
-0270-THENM,Dissatisfaction
+0270-THENM,Competitor
 9330-DHBFL,No Churn
 9169-BSVIN,No Churn
 9823-EALYC,Competitor
@@ -439,7 +439,7 @@ Customer ID,Churn Category
 3115-CZMZD,No Churn
 9375-MHRRS,No Churn
 0867-MKZVY,No Churn
-5022-KVDQT,Competitor
+5022-KVDQT,No Churn
 5787-KXGIY,No Churn
 8329-UTMVM,No Churn
 6670-MFRPK,No Churn
@@ -558,7 +558,7 @@ Customer ID,Churn Category
 3496-LFSZU,No Churn
 7562-UXTPG,No Churn
 8272-ONJLV,No Churn
-8922-LIEGH,Other
+8922-LIEGH,Competitor
 5378-IKEEG,No Churn
 9308-ANMVE,Competitor
 8049-WJCLQ,No Churn
@@ -597,7 +597,7 @@ Customer ID,Churn Category
 4905-JEFDW,No Churn
 8443-WVPSS,Competitor
 2673-CXQEU,No Churn
-8480-PPONV,Dissatisfaction
+8480-PPONV,Competitor
 1410-RSCMR,No Churn
 7297-DVYGA,Attitude
 8309-IEYJD,No Churn
@@ -624,7 +624,7 @@ Customer ID,Churn Category
 3688-FTHLT,No Churn
 3308-MHOOC,Attitude
 1703-MGIAB,No Churn
-8051-HJRLT,Price
+8051-HJRLT,Competitor
 3703-KBKZP,No Churn
 2717-HVIZY,No Churn
 0020-JDNXP,No Churn
@@ -683,8 +683,8 @@ Customer ID,Churn Category
 8231-BSWXX,No Churn
 2466-FCCPT,No Churn
 5025-GOOKI,No Churn
-1215-VFYVK,Attitude
-3376-BMGFE,No Churn
+1215-VFYVK,Competitor
+3376-BMGFE,Competitor
 8143-ETQTI,No Churn
 9819-FBNSV,No Churn
 6137-NICCO,Competitor
@@ -695,7 +695,7 @@ Customer ID,Churn Category
 8020-BWHYL,No Churn
 4446-BZKHU,Competitor
 4359-INNWN,No Churn
-6745-JEFZB,Competitor
+6745-JEFZB,Attitude
 9242-TKFSV,No Churn
 4672-FOTSD,No Churn
 1087-UDSIH,No Churn
@@ -703,7 +703,7 @@ Customer ID,Churn Category
 1371-OJCEK,No Churn
 0384-RVBPI,No Churn
 7120-RFMVS,No Churn
-9223-UCPVT,Other
+9223-UCPVT,Competitor
 9739-JLPQJ,Competitor
 0687-ZVTHB,No Churn
 4536-PLEQY,No Churn
@@ -751,7 +751,7 @@ Customer ID,Churn Category
 0225-ZORZP,No Churn
 4482-EWFMI,No Churn
 0967-BMLBD,No Churn
-6728-WYQBC,Competitor
+6728-WYQBC,No Churn
 1897-OKVMW,No Churn
 3235-ETOOB,No Churn
 3717-OEAUQ,No Churn
@@ -797,7 +797,7 @@ Customer ID,Churn Category
 0620-XEFWH,No Churn
 1403-LKLIK,No Churn
 4334-HOWRP,No Churn
-2272-JKMSI,Dissatisfaction
+2272-JKMSI,Competitor
 3682-YEUWS,No Churn
 8000-REIQB,No Churn
 7130-YXBRO,No Churn
@@ -841,7 +841,7 @@ Customer ID,Churn Category
 5504-WSIUR,No Churn
 1444-VVSGW,No Churn
 9408-SSNVZ,No Churn
-7124-UGSUR,Competitor
+7124-UGSUR,Other
 0625-AFOHS,No Churn
 0988-AADSA,No Churn
 5747-PMBSQ,No Churn
@@ -858,7 +858,7 @@ Customer ID,Churn Category
 2332-TODQS,Competitor
 4091-TVOCN,No Churn
 4911-BANWH,No Churn
-7779-LGOVN,No Churn
+7779-LGOVN,Competitor
 0549-CYCQN,No Churn
 3440-JPSCL,No Churn
 4778-IZARL,Competitor
@@ -884,8 +884,8 @@ Customer ID,Churn Category
 4056-QHXHZ,No Churn
 9743-DQKQW,No Churn
 5201-FRKKS,No Churn
-2528-HFYZX,Other
-6481-OGDOO,Attitude
+2528-HFYZX,Competitor
+6481-OGDOO,Competitor
 4429-WYGFR,No Churn
 8087-LGYHQ,No Churn
 8344-WFMFH,No Churn
@@ -907,8 +907,8 @@ Customer ID,Churn Category
 7142-HVGBG,Price
 8232-UTFOZ,No Churn
 6485-QXWWE,No Churn
-9624-EGDEQ,Attitude
-6583-SZVGP,Competitor
+9624-EGDEQ,No Churn
+6583-SZVGP,No Churn
 9722-UJOJR,No Churn
 5567-GZKQY,Competitor
 3063-QFSZL,No Churn
@@ -992,7 +992,7 @@ Customer ID,Churn Category
 8945-GRKHX,No Churn
 5666-CYCYZ,No Churn
 4654-DLAMQ,No Churn
-3768-VHXQO,Competitor
+3768-VHXQO,No Churn
 5982-FPVQN,Competitor
 1194-SPVSP,No Churn
 1240-KNSEZ,Competitor
@@ -1021,7 +1021,7 @@ Customer ID,Churn Category
 1116-FRYVH,No Churn
 1061-PNTHC,No Churn
 9755-JHNMN,No Churn
-3030-ZKIWL,Competitor
+3030-ZKIWL,No Churn
 5996-NRVXR,Competitor
 2371-JUNGC,Dissatisfaction
 4992-LTJNE,No Churn
@@ -1108,7 +1108,7 @@ Customer ID,Churn Category
 3797-VTIDR,No Churn
 4522-XRWWI,No Churn
 5151-HQRDG,No Churn
-6357-JJPQT,Price
+6357-JJPQT,Competitor
 8966-KZXXA,No Churn
 5960-WPXQM,No Churn
 7159-NOKYQ,No Churn
@@ -1122,7 +1122,7 @@ Customer ID,Churn Category
 4441-NIHPT,Dissatisfaction
 6900-RBKER,No Churn
 6112-KTHFQ,No Churn
-6898-MDLZW,Attitude
+6898-MDLZW,Competitor
 9253-QXKBE,No Churn
 6177-PEVRA,Competitor
 1810-MVMAI,No Churn
@@ -1197,7 +1197,7 @@ Customer ID,Churn Category
 0048-PIHNL,No Churn
 8107-KNCIM,No Churn
 2067-QYTCF,No Churn
-5010-IPEAQ,Other
+5010-IPEAQ,Attitude
 0871-URUWO,No Churn
 7730-CLDSV,No Churn
 0422-OHQHQ,No Churn
@@ -1251,7 +1251,7 @@ Customer ID,Churn Category
 8640-SDGKB,Competitor
 3108-PCCGG,No Churn
 8258-GSTJK,Competitor
-2000-DHJUY,Attitude
+2000-DHJUY,No Churn
 4967-WPNCF,No Churn
 4486-EFAEB,No Churn
 1852-XEMDW,No Churn
@@ -1285,7 +1285,7 @@ Customer ID,Churn Category
 4680-KUTAJ,No Churn
 4893-GYUJU,No Churn
 1080-BWSYE,No Churn
-3143-JQEGI,Competitor
+3143-JQEGI,Attitude
 6786-OBWQR,No Churn
 6693-FRIRW,No Churn
 9689-PTNPG,No Churn
@@ -1294,10 +1294,10 @@ Customer ID,Churn Category
 8849-PRIQJ,No Churn
 4791-QRGMF,Competitor
 8250-ZNGGW,No Churn
-3096-YXENJ,Attitude
+3096-YXENJ,Competitor
 8985-OOPOS,No Churn
 0196-VULGZ,No Churn
-0795-XCCTE,Other
+0795-XCCTE,Competitor
 5346-BZCHP,No Churn
 4707-MAXGU,No Churn
 5260-UMPWX,No Churn
@@ -1308,7 +1308,7 @@ Customer ID,Churn Category
 6500-JVEGC,No Churn
 5495-GPSRW,No Churn
 2832-SCUCO,No Churn
-4654-GGUII,Price
+4654-GGUII,Competitor
 0292-WEGCH,No Churn
 6923-JHPMP,No Churn
 7629-WIXZF,No Churn
@@ -1318,7 +1318,7 @@ Customer ID,Churn Category
 2612-RRIDN,No Churn
 1583-IHQZE,Competitor
 2478-EEWWM,No Churn
-0310-MVLET,Attitude
+0310-MVLET,No Churn
 6447-GORXK,No Churn
 7718-RXDGG,No Churn
 4763-PGDPO,No Churn
