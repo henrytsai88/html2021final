@@ -3,8 +3,8 @@ import warnings
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from sklearn.utils import shuffle
 from sklearn.metrics import f1_score
+from sklearn.model_selection import train_test_split
 from xgboost import XGBClassifier, plot_importance
 
 def load_data(dir, mode='Train'):
@@ -89,35 +89,15 @@ def preprocess_data(df, mapper):
 
     return x_labeled, y_labeled, x_unlabeled
 
-def train_test_split(x, y, n, random_state=0):
+def train(x_train, x_val, y_train, y_val, random_state=0):
     """
-        Shuffle data. Split data into training and testing set.
+        Train the model.
     """
-    x, y = shuffle(x, y, random_state=random_state)
-    return x[:n], y[:n], x[n:], y[n:]
-
-DATA_DIR = './html2021final/'
-OUT_DIR = './output/'
-
-def main():
-    warnings.filterwarnings('ignore')
-    if not os.path.exists(OUT_DIR):
-        os.makedirs(OUT_DIR)
-
-    seed = 0 # for reproducibility
-
-    # training phase
-    customers = load_data(DATA_DIR, mode='Train')
-    mapper = get_mapper(customers)
-    x, y, _ = preprocess_data(customers, mapper)
-    print(f'train data shape: {x.shape}, {y.shape}')
-    x_train, y_train, x_val, y_val = train_test_split(x, y, 3000, random_state=seed)
-
     # train with xgboost
     best_model, best_f1_score = None, 0
     for n_estimators in [10, 20, 50, 100]:
         print(f'n_estimators: {n_estimators}')
-        model = XGBClassifier(n_estimators=n_estimators, learning_rate=0.3, verbosity=0, random_state=seed)
+        model = XGBClassifier(n_estimators=n_estimators, learning_rate=0.3, verbosity=0, random_state=random_state)
         model.fit(x_train, y_train)
 
         # print(f'feature importance:\n{model.feature_importances_}')
@@ -136,11 +116,38 @@ def main():
             best_model = model
             best_f1_score = val_f1_score
 
+    return best_model
+
+DATA_DIR = './html2021final/'
+OUT_DIR = './output/'
+
+def main():
+    warnings.filterwarnings('ignore')
+    if not os.path.exists(OUT_DIR):
+        os.makedirs(OUT_DIR)
+
+    seed = 0 # for reproducibility
+
+    # training phase
+    customers = load_data(DATA_DIR, mode='Train')
+    mapper = get_mapper(customers)
+    x, y, x_unlabeled = preprocess_data(customers, mapper)
+    print(f'train data shape: {x.shape}, {y.shape}')
+    x_train, x_val, y_train, y_val = train_test_split(x, y, test_size=0.2, random_state=seed)
+    model = train(x_train, x_val, y_train, y_val, random_state=seed)
+
+    # pseudo label training
+    y_unlabeled = model.predict(x_unlabeled)
+    print(f'unlabeled data shape: {x_unlabeled.shape}, {y_unlabeled.shape}')
+    x_train = np.concatenate((x_train, x_unlabeled), axis=0)
+    y_train = np.concatenate((y_train, y_unlabeled), axis=0)
+    model = train(x_train, x_val, y_train, y_val, random_state=seed)
+
     # testing phase
     customers = load_data(DATA_DIR, mode='Test')
     _, _, x_test = preprocess_data(customers, mapper)
     print(f'test data shape: {x_test.shape}')
-    y_pred = best_model.predict(x_test)
+    y_pred = model.predict(x_test)
     print(y_pred)
     out = pd.DataFrame({
         'Customer ID': customers['Customer ID'],
