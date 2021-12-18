@@ -9,9 +9,7 @@ from xgboost import XGBClassifier, plot_importance
 
 def load_data(dir, mode='Train'):
     """
-        Load all csv files and combine them to two dataframes.
-        The 1st dataframe is from csv files that have 'Customer ID'.
-        The 2nd dataframe is from 'population.csv', which is not directly relative to customers.
+        Load all csv files and combine them to a dataframe.
     """
     # load train/test IDs
     assert mode in ['Train', 'Test']
@@ -26,10 +24,13 @@ def load_data(dir, mode='Train'):
     # load 'population.csv'
     filepath = os.path.join(dir, 'population.csv')
     population = pd.read_csv(filepath)
+    # map 'Zip Code' to 'Population'
+    df['Population'] = df['Zip Code'].replace(population.set_index('Zip Code')['Population'])
+    df = df.drop('Zip Code', axis=1)
 
-    return df, population
+    return df
 
-def get_mapper(df, population):
+def get_mapper(df):
     """
         Compute the mapping functions from data.
         The mapping functions are used for missing value imputation.
@@ -38,7 +39,7 @@ def get_mapper(df, population):
     for col_name in df.columns:
         if col_name in ['Customer ID', 'Churn Category']:
             continue
-        elif col_name in ['Count', 'Country', 'State', 'City', 'Quarter', 'Lat Long', 'Zip Code']:
+        elif col_name in ['Count', 'Country', 'State', 'City', 'Quarter', 'Lat Long']:
             continue
         elif df[col_name].dtypes == 'float64':
             # store the mean
@@ -49,7 +50,7 @@ def get_mapper(df, population):
             mapper[col_name] = (categories, df[col_name].mode()[0])
     return mapper
 
-def preprocess_data(df, population, mapper):
+def preprocess_data(df, mapper):
     """
         Preprocess data to numpy arrays, including:
         1. impute missing values,
@@ -62,7 +63,7 @@ def preprocess_data(df, population, mapper):
     for col_name in df.columns:
         if col_name in ['Customer ID', 'Churn Category']: # skip
             continue
-        elif col_name in ['Count', 'Country', 'State', 'City', 'Quarter', 'Lat Long', 'Zip Code']: # useless features
+        elif col_name in ['Count', 'Country', 'State', 'City', 'Quarter', 'Lat Long']: # useless features
             df = df.drop(col_name, axis=1)
         elif df[col_name].dtypes == 'float64': # numeric features
             val = mapper[col_name]
@@ -106,9 +107,9 @@ def main():
     seed = 0 # for reproducibility
 
     # training phase
-    customers, population = load_data(DATA_DIR, mode='Train')
-    mapper = get_mapper(customers, population)
-    x, y, _ = preprocess_data(customers, population, mapper)
+    customers = load_data(DATA_DIR, mode='Train')
+    mapper = get_mapper(customers)
+    x, y, _ = preprocess_data(customers, mapper)
     print(f'train data shape: {x.shape}, {y.shape}')
     x_train, y_train, x_val, y_val = train_test_split(x, y, 3000, random_state=seed)
 
@@ -129,8 +130,8 @@ def main():
         print('val f1 score:\t{:.4f}\n'.format(f1_score(y_val, y_pred, average='macro')))
 
     # testing phase
-    customers, _ = load_data(DATA_DIR, mode='Test')
-    _, _, x_test = preprocess_data(customers, population, mapper)
+    customers = load_data(DATA_DIR, mode='Test')
+    _, _, x_test = preprocess_data(customers, mapper)
     print(f'test data shape: {x_test.shape}')
     y_pred = model.predict(x_test)
     print(y_pred)
