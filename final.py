@@ -7,6 +7,14 @@ from sklearn.metrics import f1_score
 from sklearn.model_selection import train_test_split
 from xgboost import XGBClassifier, plot_importance
 
+
+def get_confidence(model, X):
+    """
+        class with max probability is the predicted class
+        use the prob. as confidence
+    """
+    y_pred_prob = model.predict_proba(X).max(axis=1)
+    return y_pred_prob
 def load_data(dir, mode='Train'):
     """
         Load all csv files and combine them to a dataframe.
@@ -139,6 +147,9 @@ def main():
     # pseudo label training
     y_unlabeled = model.predict(x_unlabeled)
     print(f'unlabeled data shape: {x_unlabeled.shape}, {y_unlabeled.shape}')
+    #confidence of prediction, i.e. the prob. of each prediction
+    y_confidence = get_confidence(model=model, X=x_unlabeled)
+
     x_train = np.concatenate((x_train, x_unlabeled), axis=0)
     y_train = np.concatenate((y_train, y_unlabeled), axis=0)
     model = train(x_train, x_val, y_train, y_val, random_state=seed)
