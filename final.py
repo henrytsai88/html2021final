@@ -8,13 +8,14 @@ from sklearn.metrics import f1_score
 from sklearn.model_selection import train_test_split
 from xgboost import XGBClassifier, plot_importance
 
-def get_confidence(model, X):
+def filter_data_by_confidence(x, model, threshold):
     """
-        class with max probability is the predicted class
-        use the prob. as confidence
+        Filter data whose predicted confidence is higher than the threshold.
     """
-    y_pred_prob = model.predict_proba(X).max(axis=1)
-    return y_pred_prob
+    y_confidence = model.predict_proba(x).max(axis=1)
+    y_confidence = np.array(y_confidence)
+    indices = np.where(y_confidence >= threshold)[0]
+    return x[indices]
 
 def load_data(dir, mode='Train'):
     """
@@ -155,11 +156,10 @@ def main():
     model = train(x_train, x_val, y_train, y_val, random_state=seed)
 
     # pseudo label training
+    print(f'unlabeled data shape (before filtering): {x_unlabeled.shape}')
+    x_unlabeled = filter_data_by_confidence(x_unlabeled, model, threshold=0.9)
+    print(f'unlabeled data shape (after filtering): {x_unlabeled.shape}')
     y_unlabeled = model.predict(x_unlabeled)
-    print(f'unlabeled data shape: {x_unlabeled.shape}, {y_unlabeled.shape}')
-    # confidence of prediction, i.e. the prob. of each prediction
-    y_confidence = get_confidence(model=model, X=x_unlabeled)
-
     x_train = np.concatenate((x_train, x_unlabeled), axis=0)
     y_train = np.concatenate((y_train, y_unlabeled), axis=0)
     model = train(x_train, x_val, y_train, y_val, random_state=seed)
