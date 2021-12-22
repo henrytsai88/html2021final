@@ -7,7 +7,6 @@ from sklearn.metrics import f1_score
 from sklearn.model_selection import train_test_split
 from xgboost import XGBClassifier, plot_importance
 
-
 def get_confidence(model, X):
     """
         class with max probability is the predicted class
@@ -15,6 +14,7 @@ def get_confidence(model, X):
     """
     y_pred_prob = model.predict_proba(X).max(axis=1)
     return y_pred_prob
+
 def load_data(dir, mode='Train'):
     """
         Load all csv files and combine them to a dataframe.
@@ -147,7 +147,7 @@ def main():
     # pseudo label training
     y_unlabeled = model.predict(x_unlabeled)
     print(f'unlabeled data shape: {x_unlabeled.shape}, {y_unlabeled.shape}')
-    #confidence of prediction, i.e. the prob. of each prediction
+    # confidence of prediction, i.e. the prob. of each prediction
     y_confidence = get_confidence(model=model, X=x_unlabeled)
 
     x_train = np.concatenate((x_train, x_unlabeled), axis=0)
@@ -160,9 +160,15 @@ def main():
     print(f'test data shape: {x_test.shape}')
     y_pred = model.predict(x_test)
     print(y_pred)
+
+    # output csv file
     out = pd.DataFrame({
         'Customer ID': customers['Customer ID'],
         'Churn Category': y_pred
+    })
+    # map 'Churn Category' from string format to numeric format
+    out['Churn Category'] = out['Churn Category'].map({
+        'No Churn': 0, 'Competitor': 1, 'Dissatisfaction': 2, 'Attitude': 3, 'Price': 4, 'Other': 5
     })
     out.to_csv(os.path.join(OUT_DIR, 'submission.csv'), index=False)
 
