@@ -1,4 +1,5 @@
 import os
+import re
 import warnings
 import numpy as np
 import pandas as pd
@@ -32,9 +33,18 @@ def load_data(dir, mode='Train'):
     # load 'population.csv'
     filepath = os.path.join(dir, 'population.csv')
     population = pd.read_csv(filepath)
+    
     # map 'Zip Code' to 'Population'
     df['Population'] = df['Zip Code'].replace(population.set_index('Zip Code')['Population'])
     df = df.drop('Zip Code', axis=1)
+
+    # replace 'Latitude' and 'Longitude' if 'Lat Long' is not nan
+    for index, _ in df.iterrows():
+        if not pd.isnull(df.loc[index, 'Lat Long']):
+            # extract float numbers from string by regular expression
+            latlong = re.findall(r'[-+]?\d*\.\d+|\d+', df.loc[index, 'Lat Long'])
+            df.loc[index, ['Latitude', 'Longitude']]= list(map(float, latlong))
+    df = df.drop('Lat Long', axis=1)
 
     return df
 
@@ -47,7 +57,7 @@ def get_mapper(df):
     for col_name in df.columns:
         if col_name in ['Customer ID', 'Churn Category']:
             continue
-        elif col_name in ['Count', 'Country', 'State', 'City', 'Quarter', 'Lat Long']:
+        elif col_name in ['Count', 'Country', 'State', 'City', 'Quarter']:
             continue
         elif df[col_name].dtypes == 'float64':
             # store the mean
@@ -71,7 +81,7 @@ def preprocess_data(df, mapper):
     for col_name in df.columns:
         if col_name in ['Customer ID', 'Churn Category']: # skip
             continue
-        elif col_name in ['Count', 'Country', 'State', 'City', 'Quarter', 'Lat Long']: # useless features
+        elif col_name in ['Count', 'Country', 'State', 'City', 'Quarter']: # useless features
             df = df.drop(col_name, axis=1)
         elif df[col_name].dtypes == 'float64': # numeric features
             val = mapper[col_name]
