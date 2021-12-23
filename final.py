@@ -1,4 +1,5 @@
 import os
+import re
 import warnings
 import numpy as np
 import pandas as pd
@@ -6,15 +7,16 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import f1_score
 from sklearn.model_selection import train_test_split
 from xgboost import XGBClassifier, plot_importance
-from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 
-def get_confidence(model, X):
+def filter_data_by_confidence(x, model, threshold):
     """
-        class with max probability is the predicted class
-        use the prob. as confidence
+        Filter data whose predicted confidence is higher than the threshold.
     """
-    y_pred_prob = model.predict_proba(X).max(axis=1)
-    return y_pred_prob, np.where(y_pred_prob>0.8)[0]
+    y_confidence = model.predict_proba(x).max(axis=1)
+    y_confidence = np.array(y_confidence)
+    indices = np.where(y_confidence >= threshold)[0]
+    return x[indices]
+
 def load_data(dir, mode='Train'):
     """
         Load all csv files and combine them to a dataframe.
@@ -32,9 +34,18 @@ def load_data(dir, mode='Train'):
     # load 'population.csv'
     filepath = os.path.join(dir, 'population.csv')
     population = pd.read_csv(filepath)
+    
     # map 'Zip Code' to 'Population'
     df['Population'] = df['Zip Code'].replace(population.set_index('Zip Code')['Population'])
     df = df.drop('Zip Code', axis=1)
+
+    # replace 'Latitude' and 'Longitude' if 'Lat Long' is not nan
+    for index, _ in df.iterrows():
+        if not pd.isnull(df.loc[index, 'Lat Long']):
+            # extract float numbers from string by regular expression
+            latlong = re.findall(r'[-+]?\d*\.\d+|\d+', df.loc[index, 'Lat Long'])
+            df.loc[index, ['Latitude', 'Longitude']]= list(map(float, latlong))
+    df = df.drop('Lat Long', axis=1)
 
     return df
 
@@ -47,7 +58,7 @@ def get_mapper(df):
     for col_name in df.columns:
         if col_name in ['Customer ID', 'Churn Category']:
             continue
-        elif col_name in ['Count', 'Country', 'State', 'City', 'Quarter', 'Lat Long']:
+        elif col_name in ['Count', 'Country', 'State', 'City', 'Quarter']:
             continue
         elif df[col_name].dtypes == 'float64':
             # store the mean
@@ -72,7 +83,7 @@ def preprocess_data(df, mapper):
     for col_name in df.columns:
         if col_name in ['Customer ID', 'Churn Category']: # skip
             continue
-        elif col_name in ['Count', 'Country', 'State', 'City', 'Quarter', 'Lat Long']: # useless features
+        elif col_name in ['Count', 'Country', 'State', 'City', 'Quarter']: # useless features
             df = df.drop(col_name, axis=1)
         elif df[col_name].dtypes == 'float64': # numeric features
             val = mapper[col_name]
@@ -127,9 +138,6 @@ def train(x_train, x_val, y_train, y_val, random_state=0):
                 best_f1_score = val_f1_score
 
     return best_model
-def LDA(X,y):
-    X_r_lda = LinearDiscriminantAnalysis(n_components=2).fit(X, y).transform(X)
-    return X_r_lda
 def PCA(df):
     import pandas as pd
     from sklearn.datasets import load_breast_cancer
@@ -161,35 +169,35 @@ def main():
     mapper = get_mapper(customers)
     x, y, x_unlabeled = preprocess_data(customers, mapper)
     
-    x_unlabeled = lda_model.transform(x_unlabeled)
     print(f'train data shape: {x.shape}, {y.shape}')
     x_train, x_val, y_train, y_val = train_test_split(x, y, test_size=0.2, random_state=seed)
     model = train(x_train, x_val, y_train, y_val, random_state=seed)
 
     # pseudo label training
+    print(f'unlabeled data shape (before filtering): {x_unlabeled.shape}')
+    x_unlabeled = filter_data_by_confidence(x_unlabeled, model, threshold=0.9)
+    print(f'unlabeled data shape (after filtering): {x_unlabeled.shape}')
     y_unlabeled = model.predict(x_unlabeled)
-    print(f'unlabeled data shape: {x_unlabeled.shape}, {y_unlabeled.shape}')
-    #confidence of prediction, i.e. the prob. of each prediction
-    y_confidence, indexes = get_confidence(model=model, X=x_unlabeled)
-    pseudo_x = x_unlabeled[indexes,:]
-    pseudo_label = y_unlabeled[indexes]
-    x_train = np.concatenate((x_train, pseudo_x), axis=0)
-    y_train = np.concatenate((y_train, pseudo_label), axis=0)
-
-    lda_model.fit_transform(x_train, y_train)
+    x_train = np.concatenate((x_train, x_unlabeled), axis=0)
+    y_train = np.concatenate((y_train, y_unlabeled), axis=0)
     model = train(x_train, x_val, y_train, y_val, random_state=seed)
 
     # testing phase
     customers = load_data(DATA_DIR, mode='Test')
     _, _, x_test = preprocess_data(customers, mapper)
     
-    x_test = lda_model.transform(x_test)
     print(f'test data shape: {x_test.shape}')
     y_pred = model.predict(x_test)
     print(y_pred)
+
+    # output csv file
     out = pd.DataFrame({
         'Customer ID': customers['Customer ID'],
         'Churn Category': y_pred
+    })
+    # map 'Churn Category' from string format to numeric format
+    out['Churn Category'] = out['Churn Category'].map({
+        'No Churn': 0, 'Competitor': 1, 'Dissatisfaction': 2, 'Attitude': 3, 'Price': 4, 'Other': 5
     })
     out.to_csv(os.path.join(OUT_DIR, 'submission.csv'), index=False)
 
