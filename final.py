@@ -7,6 +7,60 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import f1_score
 from sklearn.model_selection import train_test_split
 from xgboost import XGBClassifier, plot_importance
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
+
+
+def dimention_reduction(method, x, feature_num=0, y=None):
+    '''
+        pca: 
+            unsupervised mode, thus only x is utilized
+        lda: 
+            1. supervised mode, thus both x,y is utilized
+            2. limit : n_component < N_class
+    '''
+
+    if method == "pca":
+        return pca_transform(x, feature_num)
+    elif method == "lda":
+        return lda_transform(x, y, feature_num)
+    else:
+        print("no dimension reduction")
+        return x
+
+
+def lda_transform(x, y, feature_num):
+    '''
+        when train mode: lda_model is fut with training data, and save as global var
+        when test mode: access lda model save as global var 
+    '''
+    global lda_model
+    # train mode
+    if y is not None:
+        lda_model = LDA(n_components=feature_num)
+        lda_model = lda_model.fit(x, y)
+        return lda_model.transform(x)
+    # test mode
+    else:
+        return lda_model.transform(x)
+
+
+def pca_transform(x, feature_num):
+
+    # normalization
+    scaler = StandardScaler()
+    scaler.fit(x)
+    scaled_data = scaler.transform(x)
+
+    # 第三步: 對數據做PCA降維，參數n_components表示降低至多少維度
+
+    pca = PCA(n_components=feature_num)
+    pca.fit(scaled_data)
+    x_pca = pca.transform(scaled_data)
+
+    return x_pca
+
 
 def filter_data_by_confidence(x, model, threshold):
     """
@@ -16,6 +70,7 @@ def filter_data_by_confidence(x, model, threshold):
     y_confidence = np.array(y_confidence)
     indices = np.where(y_confidence >= threshold)[0]
     return x[indices]
+
 
 def load_data(dir, mode='Train'):
     """
@@ -34,20 +89,24 @@ def load_data(dir, mode='Train'):
     # load 'population.csv'
     filepath = os.path.join(dir, 'population.csv')
     population = pd.read_csv(filepath)
-    
+
     # map 'Zip Code' to 'Population'
-    df['Population'] = df['Zip Code'].replace(population.set_index('Zip Code')['Population'])
+    df['Population'] = df['Zip Code'].replace(
+        population.set_index('Zip Code')['Population'])
     df = df.drop('Zip Code', axis=1)
 
     # replace 'Latitude' and 'Longitude' if 'Lat Long' is not nan
     for index, _ in df.iterrows():
         if not pd.isnull(df.loc[index, 'Lat Long']):
             # extract float numbers from string by regular expression
-            latlong = re.findall(r'[-+]?\d*\.\d+|\d+', df.loc[index, 'Lat Long'])
-            df.loc[index, ['Latitude', 'Longitude']]= list(map(float, latlong))
+            latlong = re.findall(r'[-+]?\d*\.\d+|\d+',
+                                 df.loc[index, 'Lat Long'])
+            df.loc[index, ['Latitude', 'Longitude']] = list(
+                map(float, latlong))
     df = df.drop('Lat Long', axis=1)
 
     return df
+
 
 def get_mapper(df):
     """
@@ -69,6 +128,7 @@ def get_mapper(df):
             mapper[col_name] = (categories, df[col_name].mode()[0])
     return mapper
 
+
 def preprocess_data(df, mapper):
     """
         Preprocess data to numpy arrays, including:
@@ -81,21 +141,23 @@ def preprocess_data(df, mapper):
     # impute missing values
     # print(f'features before preprocessing:\n{df.columns}\n')
     for col_name in df.columns:
-        if col_name in ['Customer ID', 'Churn Category']: # skip
+        if col_name in ['Customer ID', 'Churn Category']:  # skip
             continue
-        elif col_name in ['Count', 'Country', 'State', 'City', 'Quarter']: # useless features
+        elif col_name in ['Count', 'Country', 'State', 'City', 'Quarter']:  # useless features
             df = df.drop(col_name, axis=1)
-        elif df[col_name].dtypes == 'float64': # numeric features
+        elif df[col_name].dtypes == 'float64':  # numeric features
             val = mapper[col_name]
             df[col_name] = df[col_name].fillna(val)
-        else: # categorical features
+        else:  # categorical features
             categories, val = mapper[col_name]
             df[col_name] = df[col_name].fillna(val)
             # encode categorical features to one-hot
             for category in categories:
-                df[f'{col_name}_{category}'] = df[col_name].map(lambda x: 1 if x == category else 0)
+                df[f'{col_name}_{category}'] = df[col_name].map(
+                    lambda x: 1 if x == category else 0)
             df = df.drop(col_name, axis=1)
-    features = [col_name for col_name in df.columns if col_name not in ['Customer ID', 'Churn Category']]
+    features = [col_name for col_name in df.columns if col_name not in [
+        'Customer ID', 'Churn Category']]
     # print(f'features after preprocessing:\n{features}\n')
 
     # split labeled/unlabeled data
@@ -109,6 +171,7 @@ def preprocess_data(df, mapper):
 
     return x_labeled, y_labeled, x_unlabeled
 
+
 def train(x_train, x_val, y_train, y_val, random_state=0):
     """
         Train the model.
@@ -116,9 +179,11 @@ def train(x_train, x_val, y_train, y_val, random_state=0):
     # train with xgboost
     best_model, best_f1_score = None, 0
     for n_estimators in [10, 20, 50, 100]:
-        for gamma in [0,2]:
+        # regularization for xg_boost
+        for gamma in [0, 2]:
             print(f'n_estimators: {n_estimators}, gamma: {gamma}')
-            model = XGBClassifier(gamma=gamma, n_estimators=n_estimators, learning_rate=0.3, verbosity=0, random_state=random_state)
+            model = XGBClassifier(gamma=gamma, n_estimators=n_estimators,
+                                  learning_rate=0.3, verbosity=0, random_state=random_state)
             model.fit(x_train, y_train)
 
             # print(f'feature importance:\n{model.feature_importances_}')
@@ -138,45 +203,49 @@ def train(x_train, x_val, y_train, y_val, random_state=0):
                 best_f1_score = val_f1_score
 
     return best_model
-def PCA(df):
-    import pandas as pd
-    from sklearn.datasets import load_breast_cancer
 
-    # 第二步: 對數據做標準化，使數據在相同區間，較好比較
-    from sklearn.preprocessing import StandardScaler
-    scaler = StandardScaler()
-    scaler.fit(df)
-    scaled_data = scaler.transform(df)
 
-    # 第三步: 對數據做PCA降維，參數n_components表示降低至多少維度
-    from sklearn.decomposition import PCA
-    pca = PCA(n_components=50)
-    pca.fit(scaled_data)
-    x_pca = pca.transform(scaled_data)
-    return x_pca
 DATA_DIR = './html2021final/'
 OUT_DIR = './output/'
+
 
 def main():
     warnings.filterwarnings('ignore')
     if not os.path.exists(OUT_DIR):
         os.makedirs(OUT_DIR)
 
-    seed = 0 # for reproducibility
-
+    seed = 0  # for reproducibility
+    
+    # set dimention reduction type and set number of features
+    global dim_reduce_type
+    dim_reduce_type = "lda"
+    feature_num = 5
+    if dim_reduce_type == "lda":
+        # cause feature_num is requested < N_class in lda
+        feature_num = 5
+    elif dim_reduce_type == "pca":
+        feature_num = 50
     # training phase
     customers = load_data(DATA_DIR, mode='Train')
     mapper = get_mapper(customers)
     x, y, x_unlabeled = preprocess_data(customers, mapper)
-    
+
     print(f'train data shape: {x.shape}, {y.shape}')
-    x_train, x_val, y_train, y_val = train_test_split(x, y, test_size=0.2, random_state=seed)
+    x_train, x_val, y_train, y_val = train_test_split(
+        x, y, test_size=0.2, random_state=seed)
+
+    # pca or lda for dimention reduction
+    x_train = dimention_reduction(method=dim_reduce_type, x=x_train, feature_num=feature_num, y=y_train)
+    x_val = dimention_reduction(method=dim_reduce_type, x=x_val, feature_num=feature_num, y=y_val)
+    x_unlabeled = dimention_reduction(method=dim_reduce_type, x=x_unlabeled, feature_num=feature_num)
+    
     model = train(x_train, x_val, y_train, y_val, random_state=seed)
 
-    # pseudo label training
     print(f'unlabeled data shape (before filtering): {x_unlabeled.shape}')
     x_unlabeled = filter_data_by_confidence(x_unlabeled, model, threshold=0.9)
+
     print(f'unlabeled data shape (after filtering): {x_unlabeled.shape}')
+
     y_unlabeled = model.predict(x_unlabeled)
     x_train = np.concatenate((x_train, x_unlabeled), axis=0)
     y_train = np.concatenate((y_train, y_unlabeled), axis=0)
@@ -185,7 +254,10 @@ def main():
     # testing phase
     customers = load_data(DATA_DIR, mode='Test')
     _, _, x_test = preprocess_data(customers, mapper)
-    
+
+    x_test = dimention_reduction(
+        method=dim_reduce_type, x=x_test, feature_num=feature_num)
+
     print(f'test data shape: {x_test.shape}')
     y_pred = model.predict(x_test)
     print(y_pred)
@@ -200,6 +272,7 @@ def main():
         'No Churn': 0, 'Competitor': 1, 'Dissatisfaction': 2, 'Attitude': 3, 'Price': 4, 'Other': 5
     })
     out.to_csv(os.path.join(OUT_DIR, 'submission.csv'), index=False)
+
 
 if __name__ == '__main__':
     main()
