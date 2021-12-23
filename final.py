@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import f1_score
 from sklearn.model_selection import train_test_split
 from xgboost import XGBClassifier, plot_importance
-
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 
 def get_confidence(model, X):
     """
@@ -14,7 +14,7 @@ def get_confidence(model, X):
         use the prob. as confidence
     """
     y_pred_prob = model.predict_proba(X).max(axis=1)
-    return y_pred_prob
+    return y_pred_prob, np.where(y_pred_prob>0.8)[0]
 def load_data(dir, mode='Train'):
     """
         Load all csv files and combine them to a dataframe.
@@ -66,6 +66,7 @@ def preprocess_data(df, mapper):
         3. split labeled/unlabeled data,
         4. split features/labels.
     """
+    print(df['Churn Category'].unique())
     # impute missing values
     # print(f'features before preprocessing:\n{df.columns}\n')
     for col_name in df.columns:
@@ -104,28 +105,47 @@ def train(x_train, x_val, y_train, y_val, random_state=0):
     # train with xgboost
     best_model, best_f1_score = None, 0
     for n_estimators in [10, 20, 50, 100]:
-        print(f'n_estimators: {n_estimators}')
-        model = XGBClassifier(n_estimators=n_estimators, learning_rate=0.3, verbosity=0, random_state=random_state)
-        model.fit(x_train, y_train)
+        for gamma in [0,2]:
+            print(f'n_estimators: {n_estimators}, gamma: {gamma}')
+            model = XGBClassifier(gamma=gamma, n_estimators=n_estimators, learning_rate=0.3, verbosity=0, random_state=random_state)
+            model.fit(x_train, y_train)
 
-        # print(f'feature importance:\n{model.feature_importances_}')
-        plot_importance(model)
-        plt.savefig(os.path.join(OUT_DIR, f'{n_estimators}.png'))
+            # print(f'feature importance:\n{model.feature_importances_}')
+            plot_importance(model)
+            plt.savefig(os.path.join(OUT_DIR, f'{n_estimators}_{gamma}.png'))
 
-        y_pred = model.predict(x_train)
-        train_f1_score = f1_score(y_train, y_pred, average='macro')
-        print('train f1 score:\t{:.4f}'.format(train_f1_score))
+            y_pred = model.predict(x_train)
+            train_f1_score = f1_score(y_train, y_pred, average='macro')
+            print('train f1 score:\t{:.4f}'.format(train_f1_score))
 
-        y_pred = model.predict(x_val)
-        val_f1_score = f1_score(y_val, y_pred, average='macro')
-        print('val f1 score:\t{:.4f}\n'.format(val_f1_score))
+            y_pred = model.predict(x_val)
+            val_f1_score = f1_score(y_val, y_pred, average='macro')
+            print('val f1 score:\t{:.4f}\n'.format(val_f1_score))
 
-        if val_f1_score > best_f1_score:
-            best_model = model
-            best_f1_score = val_f1_score
+            if val_f1_score > best_f1_score:
+                best_model = model
+                best_f1_score = val_f1_score
 
     return best_model
+def LDA(X,y):
+    X_r_lda = LinearDiscriminantAnalysis(n_components=2).fit(X, y).transform(X)
+    return X_r_lda
+def PCA(df):
+    import pandas as pd
+    from sklearn.datasets import load_breast_cancer
 
+    # 第二步: 對數據做標準化，使數據在相同區間，較好比較
+    from sklearn.preprocessing import StandardScaler
+    scaler = StandardScaler()
+    scaler.fit(df)
+    scaled_data = scaler.transform(df)
+
+    # 第三步: 對數據做PCA降維，參數n_components表示降低至多少維度
+    from sklearn.decomposition import PCA
+    pca = PCA(n_components=50)
+    pca.fit(scaled_data)
+    x_pca = pca.transform(scaled_data)
+    return x_pca
 DATA_DIR = './html2021final/'
 OUT_DIR = './output/'
 
@@ -140,6 +160,8 @@ def main():
     customers = load_data(DATA_DIR, mode='Train')
     mapper = get_mapper(customers)
     x, y, x_unlabeled = preprocess_data(customers, mapper)
+    
+    x_unlabeled = lda_model.transform(x_unlabeled)
     print(f'train data shape: {x.shape}, {y.shape}')
     x_train, x_val, y_train, y_val = train_test_split(x, y, test_size=0.2, random_state=seed)
     model = train(x_train, x_val, y_train, y_val, random_state=seed)
@@ -148,15 +170,20 @@ def main():
     y_unlabeled = model.predict(x_unlabeled)
     print(f'unlabeled data shape: {x_unlabeled.shape}, {y_unlabeled.shape}')
     #confidence of prediction, i.e. the prob. of each prediction
-    y_confidence = get_confidence(model=model, X=x_unlabeled)
+    y_confidence, indexes = get_confidence(model=model, X=x_unlabeled)
+    pseudo_x = x_unlabeled[indexes,:]
+    pseudo_label = y_unlabeled[indexes]
+    x_train = np.concatenate((x_train, pseudo_x), axis=0)
+    y_train = np.concatenate((y_train, pseudo_label), axis=0)
 
-    x_train = np.concatenate((x_train, x_unlabeled), axis=0)
-    y_train = np.concatenate((y_train, y_unlabeled), axis=0)
+    lda_model.fit_transform(x_train, y_train)
     model = train(x_train, x_val, y_train, y_val, random_state=seed)
 
     # testing phase
     customers = load_data(DATA_DIR, mode='Test')
     _, _, x_test = preprocess_data(customers, mapper)
+    
+    x_test = lda_model.transform(x_test)
     print(f'test data shape: {x_test.shape}')
     y_pred = model.predict(x_test)
     print(y_pred)
