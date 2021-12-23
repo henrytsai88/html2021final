@@ -53,11 +53,9 @@ def pca_transform(x, feature_num):
     scaler.fit(x)
     scaled_data = scaler.transform(x)
 
-    # 第三步: 對數據做PCA降維，參數n_components表示降低至多少維度
-
+    # n_components means resulted dimension
     pca = PCA(n_components=feature_num)
-    pca.fit(scaled_data)
-    x_pca = pca.transform(scaled_data)
+    x_pca = pca.fit_transform(scaled_data)
 
     return x_pca
 
@@ -255,8 +253,7 @@ def main():
     customers = load_data(DATA_DIR, mode='Test')
     _, _, x_test = preprocess_data(customers, mapper)
 
-    x_test = dimention_reduction(
-        method=dim_reduce_type, x=x_test, feature_num=feature_num)
+    x_test = dimention_reduction(method=dim_reduce_type, x=x_test, feature_num=feature_num)
 
     print(f'test data shape: {x_test.shape}')
     y_pred = model.predict(x_test)
