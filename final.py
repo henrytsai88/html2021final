@@ -10,7 +10,7 @@ from xgboost import XGBClassifier, plot_importance
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
-
+from sklearn.ensemble import IsolationForest
 
 def dimention_reduction(method, x, feature_num=0, y=None):
     '''
@@ -201,7 +201,20 @@ def train(x_train, x_val, y_train, y_val, random_state=0):
                 best_f1_score = val_f1_score
 
     return best_model
-
+def outlier(x,y, threshold):
+    '''
+        detect outlier in unsupervised way
+        decision_function: Average anomaly score, higher means more likely to be outlier
+        how: based on path length( number of splittings ) in a tree
+            if a sample need more split to classify, means it's more likely to be outlier
+    '''
+    clf = IsolationForest(bootstrap=True)
+    clf.fit(x)
+    scores_pred = clf.decision_function(x)
+    # print(np.max(scores_pred), np.mean(scores_pred))
+    indices = np.where(scores_pred < threshold)[0]
+    return x[indices], y[indices]
+    
 
 DATA_DIR = './html2021final/'
 OUT_DIR = './output/'
@@ -214,6 +227,16 @@ def main():
 
     seed = 0  # for reproducibility
     
+    # training phase
+    customers = load_data(DATA_DIR, mode='Train')
+    mapper = get_mapper(customers)
+    x, y, x_unlabeled = preprocess_data(customers, mapper)
+
+    
+    print(f'train data shape: {x.shape}, {y.shape}')
+    x_train, x_val, y_train, y_val = train_test_split(
+        x, y, test_size=0.2, random_state=seed)
+
     # set dimention reduction type and set number of features
     global dim_reduce_type
     dim_reduce_type = "lda"
@@ -223,28 +246,24 @@ def main():
         feature_num = 5
     elif dim_reduce_type == "pca":
         feature_num = 50
-    # training phase
-    customers = load_data(DATA_DIR, mode='Train')
-    mapper = get_mapper(customers)
-    x, y, x_unlabeled = preprocess_data(customers, mapper)
-
-    print(f'train data shape: {x.shape}, {y.shape}')
-    x_train, x_val, y_train, y_val = train_test_split(
-        x, y, test_size=0.2, random_state=seed)
-
     # pca or lda for dimention reduction
     x_train = dimention_reduction(method=dim_reduce_type, x=x_train, feature_num=feature_num, y=y_train)
     x_val = dimention_reduction(method=dim_reduce_type, x=x_val, feature_num=feature_num, y=y_val)
     x_unlabeled = dimention_reduction(method=dim_reduce_type, x=x_unlabeled, feature_num=feature_num)
     
+    #x_train, y_train = outlier(x=x_train, y=y_train, threshold=0.1)
+    # print(f'labeled data shape (after remove outlier): {x_train.shape}')
+
     model = train(x_train, x_val, y_train, y_val, random_state=seed)
 
     print(f'unlabeled data shape (before filtering): {x_unlabeled.shape}')
+    
     x_unlabeled = filter_data_by_confidence(x_unlabeled, model, threshold=0.9)
+    y_unlabeled = model.predict(x_unlabeled)
+    x_unlabeled, y_unlabeled = outlier(x=x_unlabeled, y=y_unlabeled, threshold=0.1)
 
     print(f'unlabeled data shape (after filtering): {x_unlabeled.shape}')
 
-    y_unlabeled = model.predict(x_unlabeled)
     x_train = np.concatenate((x_train, x_unlabeled), axis=0)
     y_train = np.concatenate((y_train, y_unlabeled), axis=0)
     model = train(x_train, x_val, y_train, y_val, random_state=seed)
