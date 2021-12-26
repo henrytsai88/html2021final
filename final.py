@@ -58,7 +58,7 @@ def get_mapper(df):
     for col_name in df.columns:
         if col_name in ['Customer ID', 'Churn Category']:
             continue
-        elif col_name in ['Count', 'Country', 'State', 'City', 'Quarter']:
+        elif col_name in ['Count', 'Count_x', 'Count_y', 'Country', 'State', 'City', 'Quarter']:
             continue
         elif df[col_name].dtypes == 'float64':
             # store the mean
@@ -66,6 +66,7 @@ def get_mapper(df):
         else:
             # store the categories and the mode
             categories = df[col_name].unique()
+            categories = categories[~pd.isnull(categories)]
             mapper[col_name] = (categories, df[col_name].mode()[0])
     return mapper
 
@@ -82,7 +83,7 @@ def preprocess_data(df, mapper):
     for col_name in df.columns:
         if col_name in ['Customer ID', 'Churn Category']: # skip
             continue
-        elif col_name in ['Count', 'Country', 'State', 'City', 'Quarter']: # useless features
+        elif col_name in ['Count', 'Count_x', 'Count_y', 'Country', 'State', 'City', 'Quarter']: # useless features
             df = df.drop(col_name, axis=1)
         elif df[col_name].dtypes == 'float64': # numeric features
             val = mapper[col_name]
@@ -91,9 +92,12 @@ def preprocess_data(df, mapper):
             categories, val = mapper[col_name]
             df[col_name] = df[col_name].fillna(val)
             # encode categorical features to one-hot
-            for category in categories:
-                df[f'{col_name}_{category}'] = df[col_name].map(lambda x: 1 if x == category else 0)
-            df = df.drop(col_name, axis=1)
+            if len(categories) == 2: # binary case (Yes/No, Male/Female)
+                df[col_name] = df[col_name].map(lambda x: 1 if x == categories[0] else 0)
+            else:
+                for category in categories:
+                    df[f'{col_name}_{category}'] = df[col_name].map(lambda x: 1 if x == category else 0)
+                df = df.drop(col_name, axis=1)
     features = [col_name for col_name in df.columns if col_name not in ['Customer ID', 'Churn Category']]
     # print(f'features after preprocessing:\n{features}\n')
 
