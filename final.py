@@ -12,7 +12,8 @@ from sklearn.decomposition import PCA
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
 from sklearn.ensemble import IsolationForest
 
-def dimention_reduction(method, x, feature_num=0, y=None):
+
+def dimention_reduction(method, x, feature_num=0, y=None, mode=""):
     '''
         pca: 
             unsupervised mode, thus only x is utilized
@@ -22,22 +23,22 @@ def dimention_reduction(method, x, feature_num=0, y=None):
     '''
 
     if method == "pca":
-        return pca_transform(x, feature_num)
+        return pca_transform(x, feature_num, mode)
     elif method == "lda":
-        return lda_transform(x, y, feature_num)
+        return lda_transform(x, y, feature_num, mode)
     else:
         print("no dimension reduction")
         return x
 
 
-def lda_transform(x, y, feature_num):
+def lda_transform(x, y, feature_num, mode):
     '''
         when train mode: lda_model is fut with training data, and save as global var
         when test mode: access lda model save as global var 
     '''
     global lda_model
     # train mode
-    if y is not None:
+    if mode == "train":
         lda_model = LDA(n_components=feature_num)
         lda_model = lda_model.fit(x, y)
         return lda_model.transform(x)
@@ -46,19 +47,40 @@ def lda_transform(x, y, feature_num):
         return lda_model.transform(x)
 
 
-def pca_transform(x, feature_num):
+def pca_transform(x, feature_num, mode):
 
-    # normalization
-    scaler = StandardScaler()
-    scaler.fit(x)
-    scaled_data = scaler.transform(x)
+    global pca_model, scalar_model
 
-    # n_components means resulted dimension
-    pca = PCA(n_components=feature_num)
-    x_pca = pca.fit_transform(scaled_data)
+    if mode == "train":
+        # normalization
+        scalar_model = StandardScaler()
+        scalar_model.fit(x)
+        scaled_data = scalar_model.transform(x)
 
+        # n_components means resulted dimension
+        pca_model = PCA(n_components=feature_num)
+        x_pca = pca_model.fit(scaled_data)
+        x_pca = pca_model.transform(scaled_data)
+    else:
+        scaled_data = scalar_model.transform(x)
+        x_pca = pca_model.transform(scaled_data)
     return x_pca
 
+def outlier(x, y, threshold):
+    '''
+        detect outlier in unsupervised way
+        decision_function: Average anomaly score, higher means more likely to be outlier
+        how: based on path length( number of splittings ) in a tree
+            if a sample need more split to classify, means it's more likely to be outlier
+    '''
+    clf = IsolationForest(bootstrap=True)
+    clf.fit(x)
+    scores_pred = clf.decision_function(x)
+    print(np.max(scores_pred), np.mean(scores_pred), np.quantile(scores_pred, 0.75))
+    #threshold = np.quantile(scores_pred, 0.75)
+
+    indices = np.where(scores_pred < threshold)[0]
+    return x[indices], y[indices]
 
 def filter_data_by_confidence(x, model, threshold):
     """
@@ -142,7 +164,8 @@ def preprocess_data(df, mapper):
     for col_name in df.columns:
         if col_name in ['Customer ID', 'Churn Category']:  # skip
             continue
-        elif col_name in ['Count', 'Count_x', 'Count_y', 'Country', 'State', 'City', 'Quarter']: # useless features
+        # useless features
+        elif col_name in ['Count', 'Count_x', 'Count_y', 'Country', 'State', 'City', 'Quarter']:
             df = df.drop(col_name, axis=1)
         elif df[col_name].dtypes == 'float64':  # numeric features
             val = mapper[col_name]
@@ -151,13 +174,16 @@ def preprocess_data(df, mapper):
             categories, val = mapper[col_name]
             df[col_name] = df[col_name].fillna(val)
             # encode categorical features to one-hot
-            if len(categories) == 2: # binary case (Yes/No, Male/Female)
-                df[col_name] = df[col_name].map(lambda x: 1 if x == categories[0] else 0)
+            if len(categories) == 2:  # binary case (Yes/No, Male/Female)
+                df[col_name] = df[col_name].map(
+                    lambda x: 1 if x == categories[0] else 0)
             else:
                 for category in categories:
-                    df[f'{col_name}_{category}'] = df[col_name].map(lambda x: 1 if x == category else 0)
+                    df[f'{col_name}_{category}'] = df[col_name].map(
+                        lambda x: 1 if x == category else 0)
                 df = df.drop(col_name, axis=1)
-    features = [col_name for col_name in df.columns if col_name not in ['Customer ID', 'Churn Category']]
+    features = [col_name for col_name in df.columns if col_name not in [
+        'Customer ID', 'Churn Category']]
     # print(f'features after preprocessing:\n{features}\n')
 
     # split labeled/unlabeled data
@@ -203,20 +229,10 @@ def train(x_train, x_val, y_train, y_val, random_state=0):
                 best_f1_score = val_f1_score
 
     return best_model
-def outlier(x,y, threshold):
-    '''
-        detect outlier in unsupervised way
-        decision_function: Average anomaly score, higher means more likely to be outlier
-        how: based on path length( number of splittings ) in a tree
-            if a sample need more split to classify, means it's more likely to be outlier
-    '''
-    clf = IsolationForest(bootstrap=True)
-    clf.fit(x)
-    scores_pred = clf.decision_function(x)
-    # print(np.max(scores_pred), np.mean(scores_pred))
-    indices = np.where(scores_pred < threshold)[0]
-    return x[indices], y[indices]
-    
+
+
+
+
 
 DATA_DIR = './html2021final/'
 OUT_DIR = './output/'
@@ -228,13 +244,12 @@ def main():
         os.makedirs(OUT_DIR)
 
     seed = 0  # for reproducibility
-    
+
     # training phase
     customers = load_data(DATA_DIR, mode='Train')
     mapper = get_mapper(customers)
     x, y, x_unlabeled = preprocess_data(customers, mapper)
 
-    
     print(f'train data shape: {x.shape}, {y.shape}')
     x_train, x_val, y_train, y_val = train_test_split(
         x, y, test_size=0.2, random_state=seed)
@@ -247,22 +262,26 @@ def main():
         # cause feature_num is requested < N_class in lda
         feature_num = 5
     elif dim_reduce_type == "pca":
-        feature_num = 50
+        feature_num = 15
     # pca or lda for dimention reduction
-    x_train = dimention_reduction(method=dim_reduce_type, x=x_train, feature_num=feature_num, y=y_train)
-    x_val = dimention_reduction(method=dim_reduce_type, x=x_val, feature_num=feature_num, y=y_val)
-    x_unlabeled = dimention_reduction(method=dim_reduce_type, x=x_unlabeled, feature_num=feature_num)
-    
+    x_train = dimention_reduction(
+        method=dim_reduce_type, x=x_train, feature_num=feature_num, y=y_train, mode="train")
+    x_val = dimention_reduction(
+        method=dim_reduce_type, x=x_val, feature_num=feature_num, y=y_val, mode="val")
+    x_unlabeled = dimention_reduction(
+        method=dim_reduce_type, x=x_unlabeled, feature_num=feature_num, mode="val")
+
     #x_train, y_train = outlier(x=x_train, y=y_train, threshold=0.1)
     # print(f'labeled data shape (after remove outlier): {x_train.shape}')
 
     model = train(x_train, x_val, y_train, y_val, random_state=seed)
 
     print(f'unlabeled data shape (before filtering): {x_unlabeled.shape}')
-    
+
     x_unlabeled = filter_data_by_confidence(x_unlabeled, model, threshold=0.9)
     y_unlabeled = model.predict(x_unlabeled)
-    x_unlabeled, y_unlabeled = outlier(x=x_unlabeled, y=y_unlabeled, threshold=0.1)
+    x_unlabeled, y_unlabeled = outlier(
+        x=x_unlabeled, y=y_unlabeled, threshold=0.1)
 
     print(f'unlabeled data shape (after filtering): {x_unlabeled.shape}')
 
@@ -274,7 +293,8 @@ def main():
     customers = load_data(DATA_DIR, mode='Test')
     _, _, x_test = preprocess_data(customers, mapper)
 
-    x_test = dimention_reduction(method=dim_reduce_type, x=x_test, feature_num=feature_num)
+    x_test = dimention_reduction(
+        method=dim_reduce_type, x=x_test, feature_num=feature_num, mode="test")
 
     print(f'test data shape: {x_test.shape}')
     y_pred = model.predict(x_test)
