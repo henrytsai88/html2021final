@@ -13,7 +13,7 @@ from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
 from sklearn.ensemble import IsolationForest
 
 
-def dimention_reduction(method, x, feature_num=0, y=None, mode=""):
+def dimention_reduction(method, x, feature_num=0, y=None, mode="", random_state=0):
     '''
         pca: 
             unsupervised mode, thus only x is utilized
@@ -23,15 +23,15 @@ def dimention_reduction(method, x, feature_num=0, y=None, mode=""):
     '''
 
     if method == "pca":
-        return pca_transform(x, feature_num, mode)
+        return pca_transform(x, feature_num, mode, random_state=0)
     elif method == "lda":
-        return lda_transform(x, y, feature_num, mode)
+        return lda_transform(x, y, feature_num, mode, random_state=0)
     else:
         print("no dimension reduction")
         return x
 
 
-def lda_transform(x, y, feature_num, mode):
+def lda_transform(x, y, feature_num, mode, random_state):
     '''
         when train mode: lda_model is fut with training data, and save as global var
         when test mode: access lda model save as global var 
@@ -47,7 +47,7 @@ def lda_transform(x, y, feature_num, mode):
         return lda_model.transform(x)
 
 
-def pca_transform(x, feature_num, mode):
+def pca_transform(x, feature_num, mode, random_state):
 
     global pca_model, scalar_model
 
@@ -58,7 +58,7 @@ def pca_transform(x, feature_num, mode):
         scaled_data = scalar_model.transform(x)
 
         # n_components means resulted dimension
-        pca_model = PCA(n_components=feature_num)
+        pca_model = PCA(n_components=feature_num, random_state=random_state)
         x_pca = pca_model.fit(scaled_data)
         x_pca = pca_model.transform(scaled_data)
     else:
@@ -66,14 +66,14 @@ def pca_transform(x, feature_num, mode):
         x_pca = pca_model.transform(scaled_data)
     return x_pca
 
-def outlier(x, y, threshold):
+def outlier(x, y, threshold, random_state=0):
     '''
         detect outlier in unsupervised way
         decision_function: Average anomaly score, higher means more likely to be outlier
         how: based on path length( number of splittings ) in a tree
             if a sample need more split to classify, means it's more likely to be outlier
     '''
-    clf = IsolationForest(bootstrap=True)
+    clf = IsolationForest(bootstrap=True, random_state=0)
     clf.fit(x)
     scores_pred = clf.decision_function(x)
     print(np.max(scores_pred), np.mean(scores_pred), np.quantile(scores_pred, 0.75))
@@ -227,7 +227,7 @@ def train(x_train, x_val, y_train, y_val, random_state=0):
             if val_f1_score > best_f1_score:
                 best_model = model
                 best_f1_score = val_f1_score
-
+    
     return best_model
 
 
@@ -265,11 +265,11 @@ def main():
         feature_num = 15
     # pca or lda for dimention reduction
     x_train = dimention_reduction(
-        method=dim_reduce_type, x=x_train, feature_num=feature_num, y=y_train, mode="train")
+        method=dim_reduce_type, x=x_train, feature_num=feature_num, y=y_train, mode="train", random_state=0)
     x_val = dimention_reduction(
-        method=dim_reduce_type, x=x_val, feature_num=feature_num, y=y_val, mode="val")
+        method=dim_reduce_type, x=x_val, feature_num=feature_num, y=y_val, mode="val", random_state=0)
     x_unlabeled = dimention_reduction(
-        method=dim_reduce_type, x=x_unlabeled, feature_num=feature_num, mode="val")
+        method=dim_reduce_type, x=x_unlabeled, feature_num=feature_num, mode="val", random_state=0)
 
     #x_train, y_train = outlier(x=x_train, y=y_train, threshold=0.1)
     # print(f'labeled data shape (after remove outlier): {x_train.shape}')
@@ -294,7 +294,7 @@ def main():
     _, _, x_test = preprocess_data(customers, mapper)
 
     x_test = dimention_reduction(
-        method=dim_reduce_type, x=x_test, feature_num=feature_num, mode="test")
+        method=dim_reduce_type, x=x_test, feature_num=feature_num, mode="test", random_state=0)
 
     print(f'test data shape: {x_test.shape}')
     y_pred = model.predict(x_test)
