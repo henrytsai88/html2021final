@@ -48,6 +48,8 @@ def pca_transform(x, feature_num, mode, random_state):
         scaled_data = scalar_model.transform(x)
         x_pca = pca_model.transform(scaled_data)
     return x_pca
+
+
 def dimention_reduction(method, x, feature_num=0, y=None, mode="", random_state=0):
     '''
         pca: 
@@ -58,12 +60,14 @@ def dimention_reduction(method, x, feature_num=0, y=None, mode="", random_state=
     '''
 
     if method == "pca":
-        return pca_transform(x, feature_num, mode, random_state=0)
+        return pca_transform(x, feature_num, mode, random_state=random_state)
     elif method == "lda":
-        return lda_transform(x, y, feature_num, mode, random_state=0)
+        return lda_transform(x, y, feature_num, mode, random_state=random_state)
     else:
         print("no dimension reduction")
         return x
+
+
 def outlier(x, y, threshold, random_state=0):
     '''
         detect outlier in unsupervised way
@@ -71,7 +75,7 @@ def outlier(x, y, threshold, random_state=0):
         how: based on path length( number of splittings ) in a tree
             if a sample need more split to classify, means it's more likely to be outlier
     '''
-    clf = IsolationForest(bootstrap=True, random_state=0)
+    clf = IsolationForest(bootstrap=True, random_state=random_state)
     clf.fit(x)
     scores_pred = clf.decision_function(x)
     print(np.max(scores_pred), np.mean(scores_pred),
@@ -254,7 +258,8 @@ def main():
     config = {
         'dim_reduction' : False,
         'resample' : True,
-        'outlier_removal' : True
+        'outlier_removal' : True,
+        'pseudo_label' : True
     }
     # training phase
     customers = load_data(DATA_DIR, mode='Train')
@@ -284,28 +289,29 @@ def main():
             feature_num = 15
         # pca or lda for dimention reduction
         x_train = dimention_reduction(
-            method=dim_reduce_type, x=x_train, feature_num=feature_num, y=y_train, mode="train", random_state=0)
+            method=dim_reduce_type, x=x_train, feature_num=feature_num, y=y_train, mode="train", random_state=seed)
         x_val = dimention_reduction(
-            method=dim_reduce_type, x=x_val, feature_num=feature_num, y=y_val, mode="val", random_state=0)
+            method=dim_reduce_type, x=x_val, feature_num=feature_num, y=y_val, mode="val", random_state=seed)
         x_unlabeled = dimention_reduction(
-            method=dim_reduce_type, x=x_unlabeled, feature_num=feature_num, mode="val", random_state=0)
+            method=dim_reduce_type, x=x_unlabeled, feature_num=feature_num, mode="val", random_state=seed)
     
     model = train(x_train, x_val, y_train, y_val, random_state=seed)
 
-    print(f'unlabeled data shape (before filtering): {x_unlabeled.shape}')
+    if config['pseudo_label']:
+        print(f'unlabeled data shape (before filtering): {x_unlabeled.shape}')
 
-    x_unlabeled = filter_data_by_confidence(x_unlabeled, model, threshold=0.9)
-    y_unlabeled = model.predict(x_unlabeled)
+        x_unlabeled = filter_data_by_confidence(x_unlabeled, model, threshold=0.9)
+        y_unlabeled = model.predict(x_unlabeled)
 
-    if config['outlier_removal']:
-        x_unlabeled, y_unlabeled = outlier(
-            x=x_unlabeled, y=y_unlabeled, threshold=0.1, random_state=seed)
+        if config['outlier_removal']:
+            x_unlabeled, y_unlabeled = outlier(
+                x=x_unlabeled, y=y_unlabeled, threshold=0.1, random_state=seed)
 
-    print(f'unlabeled data shape (after filtering): {x_unlabeled.shape}')
+        print(f'unlabeled data shape (after filtering): {x_unlabeled.shape}')
 
-    x_train = np.concatenate((x_train, x_unlabeled), axis=0)
-    y_train = np.concatenate((y_train, y_unlabeled), axis=0)
-    model = train(x_train, x_val, y_train, y_val, random_state=seed)
+        x_train = np.concatenate((x_train, x_unlabeled), axis=0)
+        y_train = np.concatenate((y_train, y_unlabeled), axis=0)
+        model = train(x_train, x_val, y_train, y_val, random_state=seed)
 
     # testing phase
     customers = load_data(DATA_DIR, mode='Test')
@@ -313,7 +319,7 @@ def main():
 
     if config['dim_reduction']:
         x_test = dimention_reduction(
-            method=dim_reduce_type, x=x_test, feature_num=feature_num, mode="test", random_state=0)
+            method=dim_reduce_type, x=x_test, feature_num=feature_num, mode="test", random_state=seed)
 
     print(f'test data shape: {x_test.shape}')
     y_pred = model.predict(x_test)
