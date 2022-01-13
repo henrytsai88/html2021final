@@ -4,31 +4,14 @@ import warnings
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from sklearn.metrics import f1_score
-from sklearn.model_selection import train_test_split
-from xgboost import XGBClassifier, plot_importance
+from sklearn.ensemble import IsolationForest
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
-from sklearn.ensemble import IsolationForest
-
-
-def dimention_reduction(method, x, feature_num=0, y=None, mode="", random_state=0):
-    '''
-        pca: 
-            unsupervised mode, thus only x is utilized
-        lda: 
-            1. supervised mode, thus both x,y is utilized
-            2. limit : n_component < N_class
-    '''
-
-    if method == "pca":
-        return pca_transform(x, feature_num, mode, random_state=0)
-    elif method == "lda":
-        return lda_transform(x, y, feature_num, mode, random_state=0)
-    else:
-        print("no dimension reduction")
-        return x
+from sklearn.metrics import f1_score
+from sklearn.model_selection import train_test_split
+from xgboost import XGBClassifier, plot_importance
+from imblearn.combine import SMOTEENN
 
 
 def lda_transform(x, y, feature_num, mode, random_state):
@@ -65,7 +48,22 @@ def pca_transform(x, feature_num, mode, random_state):
         scaled_data = scalar_model.transform(x)
         x_pca = pca_model.transform(scaled_data)
     return x_pca
+def dimention_reduction(method, x, feature_num=0, y=None, mode="", random_state=0):
+    '''
+        pca: 
+            unsupervised mode, thus only x is utilized
+        lda: 
+            1. supervised mode, thus both x,y is utilized
+            2. limit : n_component < N_class
+    '''
 
+    if method == "pca":
+        return pca_transform(x, feature_num, mode, random_state=0)
+    elif method == "lda":
+        return lda_transform(x, y, feature_num, mode, random_state=0)
+    else:
+        print("no dimension reduction")
+        return x
 def outlier(x, y, threshold, random_state=0):
     '''
         detect outlier in unsupervised way
@@ -76,11 +74,22 @@ def outlier(x, y, threshold, random_state=0):
     clf = IsolationForest(bootstrap=True, random_state=0)
     clf.fit(x)
     scores_pred = clf.decision_function(x)
-    print(np.max(scores_pred), np.mean(scores_pred), np.quantile(scores_pred, 0.75))
+    print(np.max(scores_pred), np.mean(scores_pred),
+          np.quantile(scores_pred, 0.75))
     #threshold = np.quantile(scores_pred, 0.75)
 
     indices = np.where(scores_pred < threshold)[0]
     return x[indices], y[indices]
+
+
+def resample_data(x, y, random_state=0):
+    """
+        Over-sampling using SMOTE, and then under-sampling using ENN.
+    """
+    smote = SMOTEENN(random_state=random_state)
+    x, y = smote.fit_resample(x, y)
+    return x, y
+
 
 def filter_data_by_confidence(x, model, threshold):
     """
@@ -227,11 +236,8 @@ def train(x_train, x_val, y_train, y_val, random_state=0):
             if val_f1_score > best_f1_score:
                 best_model = model
                 best_f1_score = val_f1_score
-    
+
     return best_model
-
-
-
 
 
 DATA_DIR = './html2021final/'
@@ -244,7 +250,12 @@ def main():
         os.makedirs(OUT_DIR)
 
     seed = 0  # for reproducibility
-
+    # used for ablation test
+    config = {
+        'dim_reduction' : False,
+        'resample' : True,
+        'outlier_removal' : True
+    }
     # training phase
     customers = load_data(DATA_DIR, mode='Train')
     mapper = get_mapper(customers)
@@ -253,35 +264,42 @@ def main():
     print(f'train data shape: {x.shape}, {y.shape}')
     x_train, x_val, y_train, y_val = train_test_split(
         x, y, test_size=0.2, random_state=seed)
-
+    
+    if config['resample']:
+        print(
+            f'train label distribution (before resampling):\n{pd.value_counts(y_train)}')
+        x_train, y_train = resample_data(x_train, y_train, random_state=seed)
+        print(
+            f'train label distribution (after resampling):\n{pd.value_counts(y_train)}')
+        
     # set dimention reduction type and set number of features
-    global dim_reduce_type
-    dim_reduce_type = "lda"
-    feature_num = 5
-    if dim_reduce_type == "lda":
-        # cause feature_num is requested < N_class in lda
+    if config['dim_reduction']:
+        global dim_reduce_type
+        dim_reduce_type = "lda"
         feature_num = 5
-    elif dim_reduce_type == "pca":
-        feature_num = 15
-    # pca or lda for dimention reduction
-    x_train = dimention_reduction(
-        method=dim_reduce_type, x=x_train, feature_num=feature_num, y=y_train, mode="train", random_state=0)
-    x_val = dimention_reduction(
-        method=dim_reduce_type, x=x_val, feature_num=feature_num, y=y_val, mode="val", random_state=0)
-    x_unlabeled = dimention_reduction(
-        method=dim_reduce_type, x=x_unlabeled, feature_num=feature_num, mode="val", random_state=0)
-
-    #x_train, y_train = outlier(x=x_train, y=y_train, threshold=0.1)
-    # print(f'labeled data shape (after remove outlier): {x_train.shape}')
-
+        if dim_reduce_type == "lda":
+            # cause feature_num is requested < N_class in lda
+            feature_num = 5
+        elif dim_reduce_type == "pca":
+            feature_num = 15
+        # pca or lda for dimention reduction
+        x_train = dimention_reduction(
+            method=dim_reduce_type, x=x_train, feature_num=feature_num, y=y_train, mode="train", random_state=0)
+        x_val = dimention_reduction(
+            method=dim_reduce_type, x=x_val, feature_num=feature_num, y=y_val, mode="val", random_state=0)
+        x_unlabeled = dimention_reduction(
+            method=dim_reduce_type, x=x_unlabeled, feature_num=feature_num, mode="val", random_state=0)
+    
     model = train(x_train, x_val, y_train, y_val, random_state=seed)
 
     print(f'unlabeled data shape (before filtering): {x_unlabeled.shape}')
 
     x_unlabeled = filter_data_by_confidence(x_unlabeled, model, threshold=0.9)
     y_unlabeled = model.predict(x_unlabeled)
-    x_unlabeled, y_unlabeled = outlier(
-        x=x_unlabeled, y=y_unlabeled, threshold=0.1)
+
+    if config['outlier_removal']:
+        x_unlabeled, y_unlabeled = outlier(
+            x=x_unlabeled, y=y_unlabeled, threshold=0.1, random_state=seed)
 
     print(f'unlabeled data shape (after filtering): {x_unlabeled.shape}')
 
@@ -293,8 +311,9 @@ def main():
     customers = load_data(DATA_DIR, mode='Test')
     _, _, x_test = preprocess_data(customers, mapper)
 
-    x_test = dimention_reduction(
-        method=dim_reduce_type, x=x_test, feature_num=feature_num, mode="test", random_state=0)
+    if config['dim_reduction']:
+        x_test = dimention_reduction(
+            method=dim_reduce_type, x=x_test, feature_num=feature_num, mode="test", random_state=0)
 
     print(f'test data shape: {x_test.shape}')
     y_pred = model.predict(x_test)
