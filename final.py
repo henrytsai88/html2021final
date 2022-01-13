@@ -7,6 +7,15 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import f1_score
 from sklearn.model_selection import train_test_split
 from xgboost import XGBClassifier, plot_importance
+from imblearn.combine import SMOTEENN
+
+def resample_data(x, y, random_state=0):
+    """
+        Over-sampling using SMOTE, and then under-sampling using ENN.
+    """
+    smote = SMOTEENN(random_state=random_state)
+    x, y = smote.fit_resample(x, y)
+    return x, y
 
 def filter_data_by_confidence(x, model, threshold):
     """
@@ -44,7 +53,7 @@ def load_data(dir, mode='Train'):
         if not pd.isnull(df.loc[index, 'Lat Long']):
             # extract float numbers from string by regular expression
             latlong = re.findall(r'[-+]?\d*\.\d+|\d+', df.loc[index, 'Lat Long'])
-            df.loc[index, ['Latitude', 'Longitude']]= list(map(float, latlong))
+            df.loc[index, ['Latitude', 'Longitude']] = list(map(float, latlong))
     df = df.drop('Lat Long', axis=1)
 
     return df
@@ -157,6 +166,9 @@ def main():
     x, y, x_unlabeled = preprocess_data(customers, mapper)
     print(f'train data shape: {x.shape}, {y.shape}')
     x_train, x_val, y_train, y_val = train_test_split(x, y, test_size=0.2, random_state=seed)
+    print(f'train label distribution (before resampling):\n{pd.value_counts(y_train)}')
+    x_train, y_train = resample_data(x_train, y_train, random_state=seed)
+    print(f'train label distribution (after resampling):\n{pd.value_counts(y_train)}')
     model = train(x_train, x_val, y_train, y_val, random_state=seed)
 
     # pseudo label training
