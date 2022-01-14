@@ -73,15 +73,15 @@ def outlier(x, y, threshold, random_state=0):
         detect outlier in unsupervised way
         decision_function: Average anomaly score, higher means more likely to be outlier
         how: based on path length( number of splittings ) in a tree
-            if a sample need more split to classify, means it's more likely to be outlier
+            if a sample needs less split, means it's more likely to be outlier
     '''
     clf = IsolationForest(bootstrap=True, random_state=random_state)
     clf.fit(x)
     scores_pred = clf.decision_function(x)
-    print('worst outlier score:\t{:.4f}'.format(np.max(scores_pred)))
-    #threshold = np.quantile(scores_pred, 0.75)
-
-    indices = np.where(scores_pred < threshold)[0]
+    print('worst outlier score:\t{:.4f}'.format(np.min(scores_pred)))
+    indices = np.where(scores_pred > threshold)[0]
+    print('keep {:.3f} of data'.format(len(indices)/len(x)))
+    
     return x[indices], y[indices]
 
 
@@ -270,7 +270,7 @@ def main():
         x, y, test_size=0.2, random_state=seed)
     if config['outlier_removal']:
         x_train, y_train = outlier(
-            x=x_train, y=y_train, threshold=0.1, random_state=seed)
+            x=x_train, y=y_train, threshold=-0.05, random_state=seed)
     if config['resample']:
         print(
             f'train label distribution (before resampling):\n{pd.value_counts(y_train)}')
