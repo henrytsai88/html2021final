@@ -78,8 +78,7 @@ def outlier(x, y, threshold, random_state=0):
     clf = IsolationForest(bootstrap=True, random_state=random_state)
     clf.fit(x)
     scores_pred = clf.decision_function(x)
-    print(np.max(scores_pred), np.mean(scores_pred),
-          np.quantile(scores_pred, 0.75))
+    print('worst outlier score:\t{:.4f}'.format(np.max(scores_pred)))
     #threshold = np.quantile(scores_pred, 0.75)
 
     indices = np.where(scores_pred < threshold)[0]
@@ -269,7 +268,9 @@ def main():
     print(f'train data shape: {x.shape}, {y.shape}')
     x_train, x_val, y_train, y_val = train_test_split(
         x, y, test_size=0.2, random_state=seed)
-    
+    if config['outlier_removal']:
+        x_train, y_train = outlier(
+            x=x_train, y=y_train, threshold=0.1, random_state=seed)
     if config['resample']:
         print(
             f'train label distribution (before resampling):\n{pd.value_counts(y_train)}')
@@ -303,9 +304,7 @@ def main():
         x_unlabeled = filter_data_by_confidence(x_unlabeled, model, threshold=0.9)
         y_unlabeled = model.predict(x_unlabeled)
 
-        if config['outlier_removal']:
-            x_unlabeled, y_unlabeled = outlier(
-                x=x_unlabeled, y=y_unlabeled, threshold=0.1, random_state=seed)
+        
 
         print(f'unlabeled data shape (after filtering): {x_unlabeled.shape}')
 
