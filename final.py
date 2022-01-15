@@ -12,7 +12,9 @@ from sklearn.metrics import f1_score
 from sklearn.model_selection import train_test_split
 from xgboost import XGBClassifier, plot_importance
 from imblearn.combine import SMOTEENN
-
+from sklearn.model_selection import cross_val_score
+from sklearn.linear_model import LogisticRegression
+from sklearn.svm import SVC
 
 def lda_transform(x, y, feature_num, mode, random_state):
     '''
@@ -78,9 +80,12 @@ def outlier(x, y, threshold, random_state=0):
     clf = IsolationForest(bootstrap=True, random_state=random_state)
     clf.fit(x)
     scores_pred = clf.decision_function(x)
-    print('worst outlier score:\t{:.4f}'.format(np.min(scores_pred)))
     indices = np.where(scores_pred > threshold)[0]
-    print('keep {:.3f} of data'.format(len(indices)/len(x)))
+    global config
+
+    if random_state%config['print_frequency']==0:
+        print('worst outlier score:\t{:.4f}'.format(np.min(scores_pred)))
+        print('keep {:.3f} of data'.format(len(indices)/len(x)))
     
     return x[indices], y[indices]
 
@@ -170,7 +175,7 @@ def preprocess_data(df, mapper):
         3. split labeled/unlabeled data,
         4. split features/labels.
     """
-    print(df['Churn Category'].unique())
+    #print(df['Churn Category'].unique())
     # impute missing values
     # print(f'features before preprocessing:\n{df.columns}\n')
     for col_name in df.columns:
@@ -216,31 +221,40 @@ def train(x_train, x_val, y_train, y_val, random_state=0):
     """
     # train with xgboost
     best_model, best_f1_score = None, 0
-    for n_estimators in [10, 20, 50, 100]:
-        # regularization for xg_boost
-        for gamma in [0, 2]:
-            print(f'n_estimators: {n_estimators}, gamma: {gamma}')
-            model = XGBClassifier(gamma=gamma, n_estimators=n_estimators,
-                                  learning_rate=0.3, verbosity=0, random_state=random_state)
-            model.fit(x_train, y_train)
+    global config
+    
+    n_estimators = config['n_estimators']
+    gamma = config['gamma']
+    if random_state %config['print_frequency']==0:
+        print(f'n_estimators: {n_estimators}, gamma: {gamma}')
+    
+    if config['model_type'] == 'SVC':
+        model = SVC(gamma='auto', degree=5, class_weight=None, coef0=14.0, shrinking=True, kernel='rbf', probability=True)
+    elif config['model_type'] == "LogReg":
+        model = model = LogisticRegression(class_weight=None, random_state=random_state, solver='lbfgs', penalty='l2', C=5.0, max_iter=1000)
+    elif config['model_type']=='XGB':
+        model = XGBClassifier(gamma=gamma, n_estimators=n_estimators,
+                            learning_rate=0.3, verbosity=0, random_state=random_state)
+    
+    model.fit(x_train, y_train)
 
-            # print(f'feature importance:\n{model.feature_importances_}')
-            plot_importance(model)
-            plt.savefig(os.path.join(OUT_DIR, f'{n_estimators}_{gamma}.png'))
+    y_pred = model.predict(x_train)
+    train_f1_score = f1_score(y_train, y_pred, average='macro')
 
-            y_pred = model.predict(x_train)
-            train_f1_score = f1_score(y_train, y_pred, average='macro')
-            print('train f1 score:\t{:.4f}'.format(train_f1_score))
+    y_pred = model.predict(x_val)
+    val_f1_score = f1_score(y_val, y_pred, average='macro')
+    if random_state % config['print_frequency']==0:
+        print('train f1 score:\t{:.4f}'.format(train_f1_score))
+    if config['model_type']=='XGB' and random_state==config['max_seed']-1:
+        # print(f'feature importance:\n{model.feature_importances_}')
+        plot_importance(model)
+        plt.savefig(os.path.join(OUT_DIR, f'{n_estimators}_{gamma}_{int(val_f1_score*1000)}.png'))
+    
+    if val_f1_score > best_f1_score:
+        best_model = model
+        best_f1_score = val_f1_score
 
-            y_pred = model.predict(x_val)
-            val_f1_score = f1_score(y_val, y_pred, average='macro')
-            print('val f1 score:\t{:.4f}\n'.format(val_f1_score))
-
-            if val_f1_score > best_f1_score:
-                best_model = model
-                best_f1_score = val_f1_score
-
-    return best_model
+    return model, val_f1_score
 
 
 DATA_DIR = './html2021final/'
@@ -254,71 +268,89 @@ def main():
 
     seed = 0  # for reproducibility
     # used for ablation test
+    global config
     config = {
         'dim_reduction' : False,
         'resample' : True,
         'outlier_removal' : True,
-        'pseudo_label' : True
+        'pseudo_label' : True,
+        'model_type': 'XGB',
+        'n_estimators': 100,
+        'gamma':0,
+        'dim_reduce_type': 'lda',
+        'feature': 5,
+        'outlier_threshold': -0.05, 
+        'max_seed':50,
+        'confidence':0.9,
+        'print_frequency':5
     }
     # training phase
     customers = load_data(DATA_DIR, mode='Train')
     mapper = get_mapper(customers)
     x, y, x_unlabeled = preprocess_data(customers, mapper)
-
     print(f'train data shape: {x.shape}, {y.shape}')
-    x_train, x_val, y_train, y_val = train_test_split(
-        x, y, test_size=0.2, random_state=seed)
-    if config['outlier_removal']:
-        x_train, y_train = outlier(
-            x=x_train, y=y_train, threshold=-0.05, random_state=seed)
-    if config['resample']:
-        print(
-            f'train label distribution (before resampling):\n{pd.value_counts(y_train)}')
-        x_train, y_train = resample_data(x_train, y_train, random_state=seed)
-        print(
-            f'train label distribution (after resampling):\n{pd.value_counts(y_train)}')
-        
-    # set dimention reduction type and set number of features
-    if config['dim_reduction']:
-        global dim_reduce_type
-        dim_reduce_type = "lda"
-        feature_num = 5
-        if dim_reduce_type == "lda":
-            # cause feature_num is requested < N_class in lda
-            feature_num = 5
-        elif dim_reduce_type == "pca":
-            feature_num = 15
-        # pca or lda for dimention reduction
-        x_train = dimention_reduction(
-            method=dim_reduce_type, x=x_train, feature_num=feature_num, y=y_train, mode="train", random_state=seed)
-        x_val = dimention_reduction(
-            method=dim_reduce_type, x=x_val, feature_num=feature_num, y=y_val, mode="val", random_state=seed)
-        x_unlabeled = dimention_reduction(
-            method=dim_reduce_type, x=x_unlabeled, feature_num=feature_num, mode="val", random_state=seed)
     
-    model = train(x_train, x_val, y_train, y_val, random_state=seed)
-
-    if config['pseudo_label']:
-        print(f'unlabeled data shape (before filtering): {x_unlabeled.shape}')
-
-        x_unlabeled = filter_data_by_confidence(x_unlabeled, model, threshold=0.9)
-        y_unlabeled = model.predict(x_unlabeled)
-
+    best_model, best_f1_score = None, 0
+    all_val_loss = []
+    for seed in range(0,config['max_seed']):
+        if seed % config['print_frequency']==0:
+            print(f'\n=====seed:{seed}=====\n')
+        x_train, x_val, y_train, y_val = train_test_split(
+            x, y, test_size=0.2, random_state=seed)
+        if config['outlier_removal']:
+            x_train, y_train = outlier(
+                x=x_train, y=y_train, threshold=config['outlier_threshold'], random_state=seed)
+        if config['resample']:
+            # print(
+            #     f'train label distribution (before resampling):\n{pd.value_counts(y_train)}')
+            x_train, y_train = resample_data(x_train, y_train, random_state=seed)
+            # print(
+            #     f'train label distribution (after resampling):\n{pd.value_counts(y_train)}')
+            
+        # set dimention reduction type and set number of features
+        if config['dim_reduction']:
+            # pca or lda for dimention reduction
+            x_train = dimention_reduction(
+                method=config['dim_reduce_type'], x=x_train, feature_num=config['feature_num'], y=y_train, mode="train", random_state=seed)
+            x_val = dimention_reduction(
+                method=config['dim_reduce_type'], x=x_val, feature_num=config['feature_num'], y=y_val, mode="val", random_state=seed)
+            x_unlabeled = dimention_reduction(
+                method=config['dim_reduce_type'], x=x_unlabeled, feature_num=config['feature_num'], mode="val", random_state=seed)
         
+        model, val_f1_score = train(x_train, x_val, y_train, y_val, random_state=seed)
+        all_val_loss.append(val_f1_score)
+        if config['pseudo_label']:
+            #print(f'unlabeled data shape (before filtering): {x_unlabeled.shape}')
 
-        print(f'unlabeled data shape (after filtering): {x_unlabeled.shape}')
+            x_unlabeled = filter_data_by_confidence(x_unlabeled, model, threshold=config['confidence'])
+            y_unlabeled = model.predict(x_unlabeled)
 
-        x_train = np.concatenate((x_train, x_unlabeled), axis=0)
-        y_train = np.concatenate((y_train, y_unlabeled), axis=0)
-        model = train(x_train, x_val, y_train, y_val, random_state=seed)
+            #print(f'unlabeled data shape (after filtering): {x_unlabeled.shape}')
 
+            x_train = np.concatenate((x_train, x_unlabeled), axis=0)
+            y_train = np.concatenate((y_train, y_unlabeled), axis=0)
+            model, val_f1_score = train(x_train, x_val, y_train, y_val, random_state=seed)
+            all_val_loss.append(val_f1_score)
+            if val_f1_score > best_f1_score:
+                best_model = model
+                best_f1_score = val_f1_score
+
+        if seed % config['print_frequency']==0:
+            print('mean of val loss:\t{:.4f}'.format(np.array(all_val_loss).mean()))
+    
+    model = best_model
+    print(f'best val score={best_f1_score}')
+    # train all
+    x_all = np.concatenate((x_train, x_val), axis=0)
+    y_all = np.concatenate((y_train, y_val), axis=0)
+    model.fit(x_all, y_all)
     # testing phase
     customers = load_data(DATA_DIR, mode='Test')
     _, _, x_test = preprocess_data(customers, mapper)
 
     if config['dim_reduction']:
         x_test = dimention_reduction(
-            method=dim_reduce_type, x=x_test, feature_num=feature_num, mode="test", random_state=seed)
+            method=config['dim_reduce_type'], x=x_test, feature_num=config['feature_num'], mode="test", random_state=seed)
 
     print(f'test data shape: {x_test.shape}')
     y_pred = model.predict(x_test)
@@ -333,7 +365,9 @@ def main():
     out['Churn Category'] = out['Churn Category'].map({
         'No Churn': 0, 'Competitor': 1, 'Dissatisfaction': 2, 'Attitude': 3, 'Price': 4, 'Other': 5
     })
-    out.to_csv(os.path.join(OUT_DIR, 'submission.csv'), index=False)
+
+    mean_err = int(np.array(all_val_loss).mean()*100)
+    out.to_csv(os.path.join(OUT_DIR, f'submission_{config["model_type"]}_{mean_err}.csv'), index=False)
 
 
 if __name__ == '__main__':
