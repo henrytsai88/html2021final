@@ -223,7 +223,7 @@ def train(x_train, x_val, y_train, y_val, random_state=0):
     
     n_estimators = config['n_estimators']
     gamma = config['gamma']
-    if random_state %config['print_frequency']==0:
+    if random_state %config['print_frequency']==0 and config['model_type']=="XGB":
         print(f'n_estimators: {n_estimators}, gamma: {gamma}')
     
     if config['model_type'] == 'SVC':
@@ -265,23 +265,26 @@ def main():
     global config
     config = {
         'dim_reduction' : False,
-        'resample' : True,
+        'resample' : False,
         'outlier_removal' : True,
         'pseudo_label' : True,
-        'model_type': 'XGB',
-        'n_estimators': 100,
-        'gamma':0,
+        # XGB, SVC, LogReg
+        'model_type': 'LogReg',
+        # 50, 100, 120, 150
+        'n_estimators': 50,
+        # 0, 2, 4 
+        'gamma':2,
         'dim_reduce_type': 'lda',
-        'feature': 5,
-        'outlier_threshold': -0.05, 
-        'max_seed':100,
-        'confidence':0.9,
-        'print_frequency':10
+        'feature_num': 5,
+        'outlier_threshold': -0.1, 
+        'max_seed':2,
+        'confidence':0.8,
+        'print_frequency':1
     }
     # training phase
     customers = load_data(DATA_DIR, mode='Train')
     mapper = get_mapper(customers)
-    x, y, x_unlabeled = preprocess_data(customers, mapper)
+    x, y, x_unlabeled_original = preprocess_data(customers, mapper)
     print(f'train data shape: {x.shape}, {y.shape}')
     
     best_model, best_f1_score = None, 0
@@ -290,7 +293,7 @@ def main():
     for seed in range(0,config['max_seed']):
         if seed % config['print_frequency']==0:
             print(f'\n=====seed:{seed}=====\n')
-
+        x_unlabeled = x_unlabeled_original
         x_train, x_val, y_train, y_val = train_test_split(
             x, y, test_size=0.2, random_state=seed)
         if config['outlier_removal']:
@@ -304,6 +307,7 @@ def main():
             #     f'train label distribution (after resampling):\n{pd.value_counts(y_train)}')
             
         if config['dim_reduction']:
+            print(f'{x_train.shape}, {x_val.shape}, {x_unlabeled.shape}')
             x_train = dimention_reduction(
                 method=config['dim_reduce_type'], x=x_train, feature_num=config['feature_num'], y=y_train, mode="train", random_state=seed)
             x_val = dimention_reduction(
@@ -365,7 +369,7 @@ def main():
     filename = f'submission_{config["model_type"]}_{mean_err}_{int(10000*best_f1_score)}.csv'
     out.to_csv(os.path.join(OUT_DIR, filename) , index=False)
     with open(os.path.join(OUT_DIR, 'file_config_map.txt'), 'a+') as f:
-        f.write(f'{datetime.datetime.now().time()}\n\
+        f.write(f'\n{datetime.datetime.now().ctime()}\n\
         config: {config}\n\
         filename: {filename}\n')
 
