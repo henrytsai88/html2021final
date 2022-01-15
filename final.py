@@ -15,7 +15,7 @@ from imblearn.combine import SMOTEENN
 from sklearn.model_selection import cross_val_score
 from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC
-
+import datetime
 def lda_transform(x, y, feature_num, mode, random_state):
     '''
         when train mode: lda_model is fut with training data, and save as global var
@@ -219,8 +219,6 @@ def train(x_train, x_val, y_train, y_val, random_state=0):
     """
         Train the model.
     """
-    # train with xgboost
-    best_model, best_f1_score = None, 0
     global config
     
     n_estimators = config['n_estimators']
@@ -250,9 +248,6 @@ def train(x_train, x_val, y_train, y_val, random_state=0):
         plot_importance(model)
         plt.savefig(os.path.join(OUT_DIR, f'{n_estimators}_{gamma}_{int(val_f1_score*1000)}.png'))
     
-    if val_f1_score > best_f1_score:
-        best_model = model
-        best_f1_score = val_f1_score
 
     return model, val_f1_score
 
@@ -266,7 +261,6 @@ def main():
     if not os.path.exists(OUT_DIR):
         os.makedirs(OUT_DIR)
 
-    seed = 0  # for reproducibility
     # used for ablation test
     global config
     config = {
@@ -280,9 +274,9 @@ def main():
         'dim_reduce_type': 'lda',
         'feature': 5,
         'outlier_threshold': -0.05, 
-        'max_seed':50,
+        'max_seed':100,
         'confidence':0.9,
-        'print_frequency':5
+        'print_frequency':10
     }
     # training phase
     customers = load_data(DATA_DIR, mode='Train')
@@ -292,9 +286,11 @@ def main():
     
     best_model, best_f1_score = None, 0
     all_val_loss = []
+
     for seed in range(0,config['max_seed']):
         if seed % config['print_frequency']==0:
             print(f'\n=====seed:{seed}=====\n')
+
         x_train, x_val, y_train, y_val = train_test_split(
             x, y, test_size=0.2, random_state=seed)
         if config['outlier_removal']:
@@ -307,9 +303,7 @@ def main():
             # print(
             #     f'train label distribution (after resampling):\n{pd.value_counts(y_train)}')
             
-        # set dimention reduction type and set number of features
         if config['dim_reduction']:
-            # pca or lda for dimention reduction
             x_train = dimention_reduction(
                 method=config['dim_reduce_type'], x=x_train, feature_num=config['feature_num'], y=y_train, mode="train", random_state=seed)
             x_val = dimention_reduction(
@@ -326,7 +320,6 @@ def main():
             y_unlabeled = model.predict(x_unlabeled)
 
             #print(f'unlabeled data shape (after filtering): {x_unlabeled.shape}')
-
             x_train = np.concatenate((x_train, x_unlabeled), axis=0)
             y_train = np.concatenate((y_train, y_unlabeled), axis=0)
             model, val_f1_score = train(x_train, x_val, y_train, y_val, random_state=seed)
@@ -339,7 +332,9 @@ def main():
             print('mean of val loss:\t{:.4f}'.format(np.array(all_val_loss).mean()))
     
     model = best_model
+
     print(f'best val score={best_f1_score}')
+
     # train all
     x_all = np.concatenate((x_train, x_val), axis=0)
     y_all = np.concatenate((y_train, y_val), axis=0)
@@ -366,9 +361,13 @@ def main():
         'No Churn': 0, 'Competitor': 1, 'Dissatisfaction': 2, 'Attitude': 3, 'Price': 4, 'Other': 5
     })
 
-    mean_err = int(np.array(all_val_loss).mean()*100)
-    out.to_csv(os.path.join(OUT_DIR, f'submission_{config["model_type"]}_{mean_err}.csv'), index=False)
-
+    mean_err = int(np.array(all_val_loss).mean()*10000)
+    filename = f'submission_{config["model_type"]}_{mean_err}_{int(10000*best_f1_score)}.csv'
+    out.to_csv(os.path.join(OUT_DIR, filename) , index=False)
+    with open(os.path.join(OUT_DIR, 'file_config_map.txt'), 'a+') as f:
+        f.write(f'{datetime.datetime.now().time()}\n\
+        config: {config}\n\
+        filename: {filename}\n')
 
 if __name__ == '__main__':
     main()
