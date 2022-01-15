@@ -6,6 +6,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.metrics import f1_score
 from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LogisticRegression
+from sklearn.svm import SVC
 from xgboost import XGBClassifier, plot_importance
 from imblearn.combine import SMOTEENN
 
@@ -150,6 +152,28 @@ def train(x_train, x_val, y_train, y_val, random_state=0):
 
     return best_model
 
+def train_SVC(x_train, x_val, y_train, y_val, random_state=0):
+    """
+        Train the model.
+    """
+    # train with svc
+    model = SVC(gamma='auto', degree=5, class_weight=None, coef0=14.0, shrinking=True, kernel='rbf', probability=True)
+    model.fit(x_train, y_train)
+
+    y_pred = model.predict(x_train)
+    train_f1_score = f1_score(y_train, y_pred, average='macro')
+    print('train f1 score:\t{:.4f}'.format(train_f1_score))
+
+    y_pred = model.predict(x_val)
+    val_f1_score = f1_score(y_val, y_pred, average='macro')
+    print('val f1 score:\t{:.4f}\n'.format(val_f1_score))
+
+    # if val_f1_score > best_f1_score:
+    #     best_model = model
+    #     best_f1_score = val_f1_score
+
+    return model
+
 DATA_DIR = './html2021final/'
 OUT_DIR = './output/'
 
@@ -167,18 +191,18 @@ def main():
     print(f'train data shape: {x.shape}, {y.shape}')
     x_train, x_val, y_train, y_val = train_test_split(x, y, test_size=0.2, random_state=seed)
     print(f'train label distribution (before resampling):\n{pd.value_counts(y_train)}')
-    x_train, y_train = resample_data(x_train, y_train, random_state=seed)
+    # x_train, y_train = resample_data(x_train, y_train, random_state=seed)
     print(f'train label distribution (after resampling):\n{pd.value_counts(y_train)}')
-    model = train(x_train, x_val, y_train, y_val, random_state=seed)
+    model = train_SVC(x_train, x_val, y_train, y_val, random_state=seed)
 
     # pseudo label training
-    print(f'unlabeled data shape (before filtering): {x_unlabeled.shape}')
-    x_unlabeled = filter_data_by_confidence(x_unlabeled, model, threshold=0.9)
-    print(f'unlabeled data shape (after filtering): {x_unlabeled.shape}')
-    y_unlabeled = model.predict(x_unlabeled)
-    x_train = np.concatenate((x_train, x_unlabeled), axis=0)
-    y_train = np.concatenate((y_train, y_unlabeled), axis=0)
-    model = train(x_train, x_val, y_train, y_val, random_state=seed)
+    # print(f'unlabeled data shape (before filtering): {x_unlabeled.shape}')
+    # x_unlabeled = filter_data_by_confidence(x_unlabeled, model, threshold=0.9)
+    # print(f'unlabeled data shape (after filtering): {x_unlabeled.shape}')
+    # y_unlabeled = model.predict(x_unlabeled)
+    # x_train = np.concatenate((x_train, x_unlabeled), axis=0)
+    # y_train = np.concatenate((y_train, y_unlabeled), axis=0)
+    # model = train_SVC(x_train, x_val, y_train, y_val, random_state=seed)
 
     # testing phase
     customers = load_data(DATA_DIR, mode='Test')
