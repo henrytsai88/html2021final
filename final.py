@@ -249,7 +249,7 @@ def train_SVC(x_train, x_val, y_train, y_val, random_state=0):
         Train the model.
     """
     
-    model = SVC(gamma='auto', degree=1, class_weight='balanced', coef0=14.0, shrinking=True, kernel='rbf', probability=True)
+    model = SVC(gamma='auto', degree=1, class_weight='balanced', coef0=14.0, shrinking=True, kernel='rbf', probability=True, C=1e3)
 
     model.fit(x_train, y_train)
 
