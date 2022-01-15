@@ -11,6 +11,8 @@ from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
 from sklearn.metrics import f1_score
 from sklearn.model_selection import train_test_split
 from xgboost import XGBClassifier, plot_importance
+from sklearn.svm import SVC
+from sklearn.linear_model import LogisticRegression
 from imblearn.combine import SMOTEENN
 
 
@@ -242,6 +244,46 @@ def train(x_train, x_val, y_train, y_val, random_state=0):
 
     return best_model
 
+def train_SVC(x_train, x_val, y_train, y_val, random_state=0):
+    """
+        Train the model.
+    """
+    
+    model = SVC(gamma='auto', degree=1, class_weight='balanced', coef0=14.0, shrinking=True, kernel='rbf', probability=True)
+
+    model.fit(x_train, y_train)
+
+    y_pred = model.predict(x_train)
+    train_f1_score = f1_score(y_train, y_pred, average='macro')
+    print('train f1 score:\t{:.4f}'.format(train_f1_score))
+
+    y_pred = model.predict(x_val)
+    val_f1_score = f1_score(y_val, y_pred, average='macro')
+    print('val f1 score:\t{:.4f}\n'.format(val_f1_score))
+    
+    return model
+
+def train_LogisticRegression(x_train, x_val, y_train, y_val, random_state=0):
+    """
+        Train the model.
+    """
+    # train with logistic regression
+    model = LogisticRegression(class_weight=None, random_state=random_state, solver='lbfgs')
+    model.fit(x_train, y_train)
+
+    y_pred = model.predict(x_train)
+    train_f1_score = f1_score(y_train, y_pred, average='macro')
+    print('train f1 score:\t{:.4f}'.format(train_f1_score))
+
+    y_pred = model.predict(x_val)
+    val_f1_score = f1_score(y_val, y_pred, average='macro')
+    print('val f1 score:\t{:.4f}\n'.format(val_f1_score))
+
+    # if val_f1_score > best_f1_score:
+    #     best_model = model
+    #     best_f1_score = val_f1_score
+
+    return model
 
 DATA_DIR = './html2021final/'
 OUT_DIR = './output/'
@@ -255,10 +297,10 @@ def main():
     seed = 0  # for reproducibility
     # used for ablation test
     config = {
-        'dim_reduction' : False,
-        'resample' : True,
+        'dim_reduction' : True,
+        'resample' : False,
         'outlier_removal' : True,
-        'pseudo_label' : True
+        'pseudo_label' : False
     }
     # training phase
     customers = load_data(DATA_DIR, mode='Train')
@@ -281,13 +323,13 @@ def main():
     # set dimention reduction type and set number of features
     if config['dim_reduction']:
         global dim_reduce_type
-        dim_reduce_type = "lda"
+        dim_reduce_type = "pca"
         feature_num = 5
         if dim_reduce_type == "lda":
             # cause feature_num is requested < N_class in lda
             feature_num = 5
         elif dim_reduce_type == "pca":
-            feature_num = 15
+            feature_num = 40
         # pca or lda for dimention reduction
         x_train = dimention_reduction(
             method=dim_reduce_type, x=x_train, feature_num=feature_num, y=y_train, mode="train", random_state=seed)
@@ -296,7 +338,7 @@ def main():
         x_unlabeled = dimention_reduction(
             method=dim_reduce_type, x=x_unlabeled, feature_num=feature_num, mode="val", random_state=seed)
     
-    model = train(x_train, x_val, y_train, y_val, random_state=seed)
+    model = train_SVC(x_train, x_val, y_train, y_val, random_state=seed)
 
     if config['pseudo_label']:
         print(f'unlabeled data shape (before filtering): {x_unlabeled.shape}')
