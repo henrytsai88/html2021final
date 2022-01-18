@@ -229,9 +229,9 @@ def train(x_train, x_val, y_train, y_val, random_state=0, explainable=False):
         print(f'n_estimators: {n_estimators}, gamma: {gamma}')
     
     if config['model_type'] == 'SVC':
-        model = SVC(gamma='auto', degree=5, class_weight=None, coef0=14.0, shrinking=True, kernel='rbf', probability=True)
+        model = SVC(gamma='auto', degree=1, class_weight=None, coef0=14.0, shrinking=True, kernel='rbf', probability=True, C=1e3)
     elif config['model_type'] == "LogReg":
-        model = model = LogisticRegression(class_weight=None, random_state=random_state, solver='lbfgs', penalty='l2', C=5.0, max_iter=1000)
+        model = model = LogisticRegression(class_weight=None, random_state=random_state, solver='lbfgs', penalty='l2', C=1e3, max_iter=1000)
     elif config['model_type']=='XGB':
         model = XGBClassifier(gamma=gamma, n_estimators=n_estimators,
                             learning_rate=0.3, verbosity=0, random_state=random_state)
