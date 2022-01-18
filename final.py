@@ -11,13 +11,13 @@ from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
 from sklearn.metrics import f1_score
 from sklearn.model_selection import train_test_split
 from xgboost import XGBClassifier, plot_importance
-from sklearn.svm import SVC
-from sklearn.linear_model import LogisticRegression
 from imblearn.combine import SMOTEENN
 from sklearn.model_selection import cross_val_score
 from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC
 import datetime
+import shap
+
 def lda_transform(x, y, feature_num, mode, random_state):
     '''
         when train mode: lda_model is fut with training data, and save as global var
@@ -217,7 +217,7 @@ def preprocess_data(df, mapper):
     return x_labeled, y_labeled, x_unlabeled
 
 
-def train(x_train, x_val, y_train, y_val, random_state=0):
+def train(x_train, x_val, y_train, y_val, random_state=0, explainable=False):
     """
         Train the model.
     """
@@ -229,14 +229,25 @@ def train(x_train, x_val, y_train, y_val, random_state=0):
         print(f'n_estimators: {n_estimators}, gamma: {gamma}')
     
     if config['model_type'] == 'SVC':
-        model = SVC(gamma='auto', degree=5, class_weight=None, coef0=14.0, shrinking=True, kernel='rbf', probability=True)
+        model = SVC(gamma='auto', degree=1, class_weight=None, coef0=14.0, shrinking=True, kernel='rbf', probability=True, C=1e3)
     elif config['model_type'] == "LogReg":
-        model = model = LogisticRegression(class_weight=None, random_state=random_state, solver='lbfgs', penalty='l2', C=5.0, max_iter=1000)
+        model = model = LogisticRegression(class_weight=None, random_state=random_state, solver='lbfgs', penalty='l2', C=1e3, max_iter=1000)
     elif config['model_type']=='XGB':
         model = XGBClassifier(gamma=gamma, n_estimators=n_estimators,
                             learning_rate=0.3, verbosity=0, random_state=random_state)
     
-    model.fit(x_train, y_train)
+    fit = model.fit(x_train, y_train)
+
+    if explainable:
+        if config['model_type'] == 'XGB':
+            explainer = shap.TreeExplainer(fit)
+        elif config['model_type'] == 'SVC':
+            x_summary = shap.kmeans(x_train, 10)
+            explainer = shap.KernelExplainer(model.predict_proba, x_summary)
+        elif config['model_type'] == 'LogReg':
+            explainer = shap.LinearExplainer(fit, x_train, feature_dependence = 'independent')
+        shap_values = explainer.shap_values(x_train)
+        shap.summary_plot(shap_values, x_train)
 
     y_pred = model.predict(x_train)
     train_f1_score = f1_score(y_train, y_pred, average='macro')
@@ -253,46 +264,6 @@ def train(x_train, x_val, y_train, y_val, random_state=0):
 
     return model, val_f1_score
 
-def train_SVC(x_train, x_val, y_train, y_val, random_state=0):
-    """
-        Train the model.
-    """
-    
-    model = SVC(gamma='auto', degree=1, class_weight='balanced', coef0=14.0, shrinking=True, kernel='rbf', probability=True, C=1e3)
-
-    model.fit(x_train, y_train)
-
-    y_pred = model.predict(x_train)
-    train_f1_score = f1_score(y_train, y_pred, average='macro')
-    print('train f1 score:\t{:.4f}'.format(train_f1_score))
-
-    y_pred = model.predict(x_val)
-    val_f1_score = f1_score(y_val, y_pred, average='macro')
-    print('val f1 score:\t{:.4f}\n'.format(val_f1_score))
-    
-    return model
-
-def train_LogisticRegression(x_train, x_val, y_train, y_val, random_state=0):
-    """
-        Train the model.
-    """
-    # train with logistic regression
-    model = LogisticRegression(class_weight=None, random_state=random_state, solver='lbfgs')
-    model.fit(x_train, y_train)
-
-    y_pred = model.predict(x_train)
-    train_f1_score = f1_score(y_train, y_pred, average='macro')
-    print('train f1 score:\t{:.4f}'.format(train_f1_score))
-
-    y_pred = model.predict(x_val)
-    val_f1_score = f1_score(y_val, y_pred, average='macro')
-    print('val f1 score:\t{:.4f}\n'.format(val_f1_score))
-
-    # if val_f1_score > best_f1_score:
-    #     best_model = model
-    #     best_f1_score = val_f1_score
-
-    return model
 
 DATA_DIR = './html2021final/'
 OUT_DIR = './output/'
