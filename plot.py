@@ -1,24 +1,24 @@
-import numpy as np
 from matplotlib.pylab import plt
-from data import data_N6_158 as raw_data
-from ClientData import ClientData
 
-data = ClientData(raw_data=raw_data)
+def plot_points(data_x, data_y, label_x, folder_name="", show=True):
+    title = label_x
 
-def plotPoints(data_x, data_y, label_x, label_y, show=True):
-    title = label_y + '-' + label_x
+    plt.figure(num=title, figsize=[40, 10])
+    classes = ['No Churn', 'Competitor', 'Dissatisfaction', 'Attitude', 'Price', 'Other']
+    colors = ['r', 'g', 'b', 'c', 'm', 'y', 'gray']
+    data_x_points = []
+    count = [0]
+    total = 0
+    for y in classes:
+        data_x_points.append(data_x[data_y == y])
+        total += data_y[data_y == y].shape[0]
+        count.append(total)
+    for i in range(len(classes)):
+        plt.plot([y for y in range(count[i], count[i+1])], data_x_points[i], '.', color=colors[i])
 
-    plt.figure(num=title)
-    data_x_1 = []
-    data_y_1 = []
-    i = 0
-    for i in data.category[0]: 
-        data_x_1.append(data_x[i])
-        data_y_1.append(data_y[i])
-    plt.plot(data_x, data_y, '.', color='b')
-    plt.plot(data_x_1, data_y_1, '.', color='r')
-    plt.xlabel(label_x)
-    plt.ylabel(label_y)
+    plt.legend(classes)
     plt.title(title)
     if show:
         plt.show()
+    else:
+        plt.savefig(f"{folder_name}/{title}.png")
