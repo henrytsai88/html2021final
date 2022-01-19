@@ -1,21 +1,26 @@
 import os
 import re
+from tabnanny import verbose
 import warnings
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.ensemble import IsolationForest
 from sklearn.preprocessing import StandardScaler
-from sklearn.decomposition import PCA
+from sklearn.decomposition import PCA, KernelPCA
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
 from sklearn.metrics import f1_score
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, StratifiedKFold, GridSearchCV, KFold
 from xgboost import XGBClassifier, plot_importance
 from imblearn.combine import SMOTEENN
-from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import cross_validate
 from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC
 import datetime
+import json
+import timeit
+
+
 def lda_transform(x, y, feature_num, mode, random_state):
     '''
         when train mode: lda_model is fut with training data, and save as global var
@@ -43,7 +48,7 @@ def pca_transform(x, feature_num, mode, random_state):
         scaled_data = scalar_model.transform(x)
 
         # n_components means resulted dimension
-        pca_model = PCA(n_components=feature_num, random_state=random_state)
+        pca_model = PCA(random_state=random_state)
         x_pca = pca_model.fit(scaled_data)
         x_pca = pca_model.transform(scaled_data)
     else:
@@ -83,10 +88,10 @@ def outlier(x, y, threshold, random_state=0):
     indices = np.where(scores_pred > threshold)[0]
     global config
 
-    if random_state%config['print_frequency']==0:
+    if random_state % config['print_frequency'] == 0:
         print('worst outlier score:\t{:.4f}'.format(np.min(scores_pred)))
         print('keep {:.3f} of data'.format(len(indices)/len(x)))
-    
+
     return x[indices], y[indices]
 
 
@@ -220,78 +225,89 @@ def train(x_train, x_val, y_train, y_val, random_state=0):
         Train the model.
     """
     global config
-    
+    skf = StratifiedKFold(n_splits=5, shuffle=True)
+    x_all = np.concatenate((x_train, x_val), axis=0)
+    y_all = np.concatenate((y_train, y_val), axis=0)
     n_estimators = config['n_estimators']
     gamma = config['gamma']
-    if random_state %config['print_frequency']==0 and config['model_type']=="XGB":
-        print(f'n_estimators: {n_estimators}, gamma: {gamma}')
-    
     if config['model_type'] == 'SVC':
-        model = SVC(gamma='auto', degree=5, class_weight=None, coef0=14.0, shrinking=True, kernel='rbf', probability=True)
+        model = SVC(C=14, gamma='auto', degree=5, class_weight=None,
+                    coef0=14.0, shrinking=True, kernel='rbf', probability=True, random_state=random_state)
+        parameters = {
+            'C': 14,
+            'gamma': 'auto',
+            'degree': 5,
+            'class_weight': None,
+            'coef0': 14.0,
+            'shrinking': True,
+            'kernel': 'rbf',
+            'probability': True,
+            'random_state': random_state
+        }
+        config['svc_config'] = json.dumps(parameters)
+
     elif config['model_type'] == "LogReg":
-        model = model = LogisticRegression(class_weight=None, random_state=random_state, solver='lbfgs', penalty='l2', C=5.0, max_iter=1000)
-    elif config['model_type']=='XGB':
+        model = LogisticRegression(
+            class_weight=None, random_state=random_state, solver='lbfgs', penalty='l2', max_iter=1000)
+
+    elif config['model_type'] == 'XGB':
         model = XGBClassifier(gamma=gamma, n_estimators=n_estimators,
-                            learning_rate=0.3, verbosity=0, random_state=random_state)
-    
+                              learning_rate=0.3, verbosity=0, random_state=random_state)
+
     model.fit(x_train, y_train)
 
     y_pred = model.predict(x_train)
     train_f1_score = f1_score(y_train, y_pred, average='macro')
-
     y_pred = model.predict(x_val)
     val_f1_score = f1_score(y_val, y_pred, average='macro')
-    if random_state % config['print_frequency']==0:
-        print('train f1 score:\t{:.4f}'.format(train_f1_score))
-    if config['model_type']=='XGB' and random_state==config['max_seed']-1:
+
+    print('train f1 score:\t{:.4f}'.format(train_f1_score))
+    if config['model_type'] == 'XGB' and random_state == config['max_seed']-1:
         # print(f'feature importance:\n{model.feature_importances_}')
         plot_importance(model)
-        plt.savefig(os.path.join(OUT_DIR, f'{n_estimators}_{gamma}_{int(val_f1_score*1000)}.png'))
-    
+        plt.savefig(os.path.join(
+            OUT_DIR, f'{n_estimators}_{gamma}_{int(val_f1_score*1000)}.png'))
 
-    return model, val_f1_score
+    return model, val_f1_score, train_f1_score
 
 
 DATA_DIR = './html2021final/'
 OUT_DIR = './output/'
 
 
-def main():
-    warnings.filterwarnings('ignore')
-    if not os.path.exists(OUT_DIR):
-        os.makedirs(OUT_DIR)
+def cross_val(x_all, y_all, model):
+    train_scores = []
+    val_scores = []
+    skf = KFold(n_splits=5)
+    for train_index, test_index in skf.split(x_all, y_all):
+        X_train, X_test = x_all[train_index], x_all[test_index]
+        Y_train, y_test = y_all[train_index], y_all[test_index]
+        model.fit(X_train, Y_train)
+        y_pred = model.predict(X_train)
+        train_score = f1_score(Y_train, y_pred, average='macro')
+        train_scores.append(train_score)
+        y_pred = model.predict(X_test)
+        val_score = f1_score(y_test, y_pred, average='macro')
+        val_scores.append(val_score)
+    mean_train = np.array(train_scores).mean()
+    mean_val = np.array(val_scores).mean()
+    return mean_val, mean_train
 
-    # used for ablation test
+
+def experiment():
     global config
-    config = {
-        'dim_reduction' : False,
-        'resample' : False,
-        'outlier_removal' : True,
-        'pseudo_label' : True,
-        # XGB, SVC, LogReg
-        'model_type': 'LogReg',
-        # 50, 100, 120, 150
-        'n_estimators': 50,
-        # 0, 2, 4 
-        'gamma':2,
-        'dim_reduce_type': 'lda',
-        'feature_num': 5,
-        'outlier_threshold': -0.1, 
-        'max_seed':2,
-        'confidence':0.8,
-        'print_frequency':1
-    }
-    # training phase
     customers = load_data(DATA_DIR, mode='Train')
     mapper = get_mapper(customers)
     x, y, x_unlabeled_original = preprocess_data(customers, mapper)
     print(f'train data shape: {x.shape}, {y.shape}')
-    
+
     best_model, best_f1_score = None, 0
     all_val_loss = []
+    all_train_loss = []
+    start = timeit.default_timer()
 
-    for seed in range(0,config['max_seed']):
-        if seed % config['print_frequency']==0:
+    for seed in range(0, config['max_seed']):
+        if seed % config['print_frequency'] == 0:
             print(f'\n=====seed:{seed}=====\n')
         x_unlabeled = x_unlabeled_original
         x_train, x_val, y_train, y_val = train_test_split(
@@ -302,39 +318,60 @@ def main():
         if config['resample']:
             # print(
             #     f'train label distribution (before resampling):\n{pd.value_counts(y_train)}')
-            x_train, y_train = resample_data(x_train, y_train, random_state=seed)
+            x_train, y_train = resample_data(
+                x_train, y_train, random_state=seed)
             # print(
             #     f'train label distribution (after resampling):\n{pd.value_counts(y_train)}')
-            
+
         if config['dim_reduction']:
-            print(f'{x_train.shape}, {x_val.shape}, {x_unlabeled.shape}')
             x_train = dimention_reduction(
                 method=config['dim_reduce_type'], x=x_train, feature_num=config['feature_num'], y=y_train, mode="train", random_state=seed)
             x_val = dimention_reduction(
                 method=config['dim_reduce_type'], x=x_val, feature_num=config['feature_num'], y=y_val, mode="val", random_state=seed)
             x_unlabeled = dimention_reduction(
                 method=config['dim_reduce_type'], x=x_unlabeled, feature_num=config['feature_num'], mode="val", random_state=seed)
-        
-        model, val_f1_score = train(x_train, x_val, y_train, y_val, random_state=seed)
+
+        x_all = np.concatenate((x_train, x_val), axis=0)
+        y_all = np.concatenate((y_train, y_val), axis=0)
+
+        model, val_f1_score, train_f1_score = train(
+            x_train, x_val, y_train, y_val, random_state=seed)
+        val_f1_score, _ = cross_val(x_all, y_all, model)
         all_val_loss.append(val_f1_score)
+        all_train_loss.append(train_f1_score)
+        if val_f1_score > best_f1_score:
+            best_model = model
+            best_f1_score = val_f1_score
+            config['best_seed'] = seed
         if config['pseudo_label']:
             #print(f'unlabeled data shape (before filtering): {x_unlabeled.shape}')
+            x_unlabeled = filter_data_by_confidence(
+                x_unlabeled, model, threshold=config['confidence'])
 
-            x_unlabeled = filter_data_by_confidence(x_unlabeled, model, threshold=config['confidence'])
             y_unlabeled = model.predict(x_unlabeled)
 
             #print(f'unlabeled data shape (after filtering): {x_unlabeled.shape}')
             x_train = np.concatenate((x_train, x_unlabeled), axis=0)
             y_train = np.concatenate((y_train, y_unlabeled), axis=0)
-            model, val_f1_score = train(x_train, x_val, y_train, y_val, random_state=seed)
+            model, val_f1_score, train_f1_score = train(
+                x_train, x_val, y_train, y_val, random_state=seed)
+            val_f1_score, _ = cross_val(x_all, y_all, model)
             all_val_loss.append(val_f1_score)
+            all_train_loss.append(train_f1_score)
             if val_f1_score > best_f1_score:
                 best_model = model
                 best_f1_score = val_f1_score
+                config['best_seed'] = seed
 
-        if seed % config['print_frequency']==0:
-            print('mean of val loss:\t{:.4f}'.format(np.array(all_val_loss).mean()))
-    
+        if seed % config['print_frequency'] == 0:
+            print('mean of val loss:\t{:.4f}'.format(
+                np.array(all_val_loss).mean()))
+
+    config['best_val_score'] = best_f1_score
+    config['avg_train_f1'] = np.array(all_train_loss).mean()
+    config['avg_val_f1'] = np.array(all_val_loss).mean()
+    config['train_std'] = np.std(all_train_loss, ddof=1)
+    config['val_std'] = np.std(all_val_loss, ddof=1)
     model = best_model
 
     print(f'best val score={best_f1_score}')
@@ -355,6 +392,10 @@ def main():
     y_pred = model.predict(x_test)
     print(y_pred)
 
+    time_diff = timeit.default_timer()-start
+    config['exec_time'] = str((time_diff)//60)+"m "+str((time_diff) % 60)+"s"
+    print('exec time= '+config['exec_time'])
+
     # output csv file
     out = pd.DataFrame({
         'Customer ID': customers['Customer ID'],
@@ -367,11 +408,110 @@ def main():
 
     mean_err = int(np.array(all_val_loss).mean()*10000)
     filename = f'submission_{config["model_type"]}_{mean_err}_{int(10000*best_f1_score)}.csv'
-    out.to_csv(os.path.join(OUT_DIR, filename) , index=False)
-    with open(os.path.join(OUT_DIR, 'file_config_map.txt'), 'a+') as f:
-        f.write(f'\n{datetime.datetime.now().ctime()}\n\
-        config: {config}\n\
-        filename: {filename}\n')
+    out.to_csv(os.path.join(OUT_DIR, filename), index=False)
+    if config['formal']:
+        with open(os.path.join(OUT_DIR, 'file_config_map_formal.txt'), 'a+') as f:
+            f.write(f'\n{datetime.datetime.now().ctime()}\n\
+            config: {config}\n\
+            filename: {filename}\n')
+    else:
+        with open(os.path.join(OUT_DIR, 'file_config_map.txt'), 'a+') as f:
+            f.write(f'\n{datetime.datetime.now().ctime()}\n\
+            config: {config}\n\
+            filename: {filename}\n')
+
+
+def main():
+    warnings.filterwarnings('ignore')
+    if not os.path.exists(OUT_DIR):
+        os.makedirs(OUT_DIR)
+
+    # used for ablation test
+    global config
+
+    print('==== LOG formal time====\n')
+    config = {
+        # XGB, SVC, LogReg
+        'comment': 'LOG time',
+        'model_type': 'LogReg',
+        'exec_time': '',
+        'formal': True,
+        'dim_reduction': True,
+        'resample': False,
+        'outlier_removal': True,
+        'pseudo_label': True,
+        # 50, 100, 120, 150
+        'n_estimators': 100,
+        # 0, 2
+        'gamma': 2,
+        'dim_reduce_type': 'lda',
+        'feature_num': 5,
+        'outlier_threshold': -0.07,
+        'max_seed': 100,
+        'confidence': 0.73,
+        'print_frequency': 20,
+        'avg_train_f1': 0,
+        'avg_val_f1': 0,
+        'best_val_score': 0,
+        'best_seed': 0
+    }
+    experiment()
+    print('==== XGB formal time====\n')
+    config = {
+        # XGB, SVC, LogReg
+        'comment': 'XGB time',
+        'model_type': 'XGB',
+        'exec_time': '',
+        'formal': True,
+        'dim_reduction': False,
+        'resample': True,
+        'outlier_removal': True,
+        'pseudo_label': True,
+        # 50, 100, 120, 150
+        'n_estimators': 100,
+        # 0, 2
+        'gamma': 2,
+        'dim_reduce_type': 'lda',
+        'feature_num': 5,
+        'outlier_threshold': -0.07,
+        'max_seed': 100,
+        'confidence': 0.91,
+        'print_frequency': 20,
+        'avg_train_f1': 0,
+        'avg_val_f1': 0,
+        'best_val_score': 0,
+        'best_seed': 0
+    }
+    experiment()
+
+    print('==== SVC formal time====\n')
+    config = {
+        # XGB, SVC, LogReg
+        'comment': 'SVC time',
+        'model_type': 'SVC',
+        'exec_time': '',
+        'formal': True,
+        'dim_reduction': True,
+        'resample': False,
+        'outlier_removal': True,
+        'pseudo_label': True,
+        # 50, 100, 120, 150
+        'n_estimators': 100,
+        # 0, 2
+        'gamma': 2,
+        'dim_reduce_type': 'lda',
+        'feature_num': 5,
+        'outlier_threshold': -0.07,
+        'max_seed': 100,
+        'confidence': 0.91,
+        'print_frequency': 20,
+        'avg_train_f1': 0,
+        'avg_val_f1': 0,
+        'best_val_score': 0,
+        'best_seed': 0
+    }
+    experiment()
+
 
 if __name__ == '__main__':
     main()
