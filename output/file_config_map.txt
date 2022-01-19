@@ -1,0 +1,41 @@
+18:45:23.833597
+        config: {'dim_reduction': False, 'resample': True, 'outlier_removal': True, 'pseudo_label': True, 'model_type': 'XGB', 'n_estimators': 100, 'gamma': 0, 'dim_reduce_type': 'lda', 'feature': 5, 'outlier_threshold': -0.05, 'max_seed': 2, 'confidence': 0.9, 'print_frequency': 2}
+        filename: submission_XGB_100_0_341.csv
+        
+20:23:57.593514
+        config: {'dim_reduction': False, 'resample': True, 'outlier_removal': True, 'pseudo_label': True, 'model_type': 'XGB', 'n_estimators': 100, 'gamma': 0, 'dim_reduce_type': 'lda', 'feature': 5, 'outlier_threshold': -0.05, 'max_seed': 100, 'confidence': 0.9, 'print_frequency': 10}
+        filename: submission_XGB_3266_3843.csv
+
+Sat Jan 15 21:10:40 2022
+        config: {'dim_reduction': False, 'resample': True, 'outlier_removal': True, 'pseudo_label': True, 'model_type': 'XGB', 'n_estimators': 100, 'gamma': 2, 'dim_reduce_type': 'lda', 'feature': 5, 'outlier_threshold': -0.1, 'max_seed': 100, 'confidence': 0.9, 'print_frequency': 10}
+        filename: submission_XGB_3252_3687.csv
+
+Sat Jan 15 21:49:16 2022
+        config: {'dim_reduction': False, 'resample': True, 'outlier_removal': True, 'pseudo_label': True, 'model_type': 'XGB', 'n_estimators': 100, 'gamma': 4, 'dim_reduce_type': 'lda', 'feature': 5, 'outlier_threshold': -0.1, 'max_seed': 100, 'confidence': 0.9, 'print_frequency': 10}
+        filename: submission_XGB_3217_3867.csv
+
+Sat Jan 15 21:51:25 2022
+        config: {'dim_reduction': False, 'resample': True, 'outlier_removal': True, 'pseudo_label': True, 'model_type': 'XGB', 'n_estimators': 150, 'gamma': 2, 'dim_reduce_type': 'lda', 'feature': 5, 'outlier_threshold': -0.1, 'max_seed': 100, 'confidence': 0.9, 'print_frequency': 10}
+        filename: submission_XGB_3252_3687.csv
+
+Sat Jan 15 22:04:21 2022
+        config: {'dim_reduction': False, 'resample': True, 'outlier_removal': True, 'pseudo_label': True, 'model_type': 'XGB', 'n_estimators': 50, 'gamma': 2, 'dim_reduce_type': 'lda', 'feature_num': 5, 'outlier_threshold': -0.1, 'max_seed': 100, 'confidence': 0.9, 'print_frequency': 10}
+        filename: submission_XGB_3255_3717.csv
+
+Sat Jan 15 22:17:41 2022
+        config: {'dim_reduction': True, 'resample': False, 'outlier_removal': True, 'pseudo_label': True, 'model_type': 'LogReg', 'n_estimators': 50, 'gamma': 2, 'dim_reduce_type': 'lda', 'feature_num': 5, 'outlier_threshold': -0.1, 'max_seed': 100, 'confidence': 0.9, 'print_frequency': 10}
+        filename: submission_LogReg_2697_3181.csv
+
+Sat Jan 15 22:18:47 2022
+        config: {'dim_reduction': True, 'resample': False, 'outlier_removal': True, 'pseudo_label': True, 'model_type': 'LogReg', 'n_estimators': 50, 'gamma': 2, 'dim_reduce_type': 'pca', 'feature_num': 25, 'outlier_threshold': -0.1, 'max_seed': 100, 'confidence': 0.9, 'print_frequency': 10}
+        filename: submission_LogReg_2562_2907.csv
+
+Sat Jan 15 22:30:10 2022
+        config: {'dim_reduction': True, 'resample': False, 'outlier_removal': True, 'pseudo_label': True, 'model_type': 'SVC', 'n_estimators': 50, 'gamma': 2, 'dim_reduce_type': 'pca', 'feature_num': 25, 'outlier_threshold': -0.1, 'max_seed': 100, 'confidence': 0.8, 'print_frequency': 10}
+        filename: submission_SVC_2408_2633.csv
+
+Sat Jan 15 22:46:07 2022
+        config: {'dim_reduction': True, 'resample': False, 'outlier_removal': True, 'pseudo_label': True, 'model_type': 'SVC', 'n_estimators': 50, 'gamma': 2, 'dim_reduce_type': 'lda', 'feature_num': 5, 'outlier_threshold': -0.1, 'max_seed': 100, 'confidence': 0.8, 'print_frequency': 10}
+        filename: submission_SVC_2554_2815.csv
+
+
